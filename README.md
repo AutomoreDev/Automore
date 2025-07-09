@@ -1,0 +1,2 @@
+# Automore
+Automore SaaS platform
