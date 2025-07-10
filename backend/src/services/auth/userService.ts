@@ -107,21 +107,36 @@ export class UserService {
     try {
       const existingUser = await this.getUserByUid(firebaseUser.uid);
       const now = Timestamp.now();
-
+  
       if (existingUser) {
-        // Update existing user
-        const updateData = {
+        // Update existing user - FILTER OUT UNDEFINED VALUES
+        const updateData: any = {
           email: firebaseUser.email,
           emailVerified: firebaseUser.emailVerified,
-          displayName: firebaseUser.displayName || existingUser.displayName,
-          photoURL: firebaseUser.photoURL || existingUser.photoURL,
           updatedAt: now,
-          lastLoginAt: now,
-          ...(additionalData && Object.fromEntries(
-            Object.entries(additionalData).filter(([_, value]) => value !== undefined)
-          ))
+          lastLoginAt: now
         };
-
+  
+        // Only add fields that are not undefined
+        if (firebaseUser.displayName !== undefined) {
+          updateData.displayName = firebaseUser.displayName;
+        }
+        if (firebaseUser.photoURL !== undefined) {
+          updateData.photoURL = firebaseUser.photoURL;
+        }
+        if (firebaseUser.phoneNumber !== undefined) {
+          updateData.phoneNumber = firebaseUser.phoneNumber;
+        }
+  
+        // Add additional data if provided, filtering undefined values
+        if (additionalData) {
+          Object.entries(additionalData).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateData[key] = value;
+            }
+          });
+        }
+  
         await this.db.collection('users').doc(firebaseUser.uid).update(updateData);
         
         return {
@@ -131,29 +146,45 @@ export class UserService {
           lastLoginAt: now.toDate()
         };
       } else {
-        // Create new user
-        const newUser = {
+        // Create new user - FILTER OUT UNDEFINED VALUES
+        const newUserData: any = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           emailVerified: firebaseUser.emailVerified,
-          displayName: firebaseUser.displayName,
-          firstName: additionalData?.firstName,
-          lastName: additionalData?.lastName,
-          phoneNumber: firebaseUser.phoneNumber,
-          photoURL: firebaseUser.photoURL,
           role: additionalData?.role || UserRole.CLIENT_USER,
           status: UserStatus.ACTIVE,
-          companyId: additionalData?.companyId,
           createdAt: now,
           updatedAt: now,
-          lastLoginAt: now,
-          metadata: additionalData?.metadata
+          lastLoginAt: now
         };
-
-        await this.db.collection('users').doc(firebaseUser.uid).set(newUser);
+  
+        // Only add fields that are not undefined
+        if (firebaseUser.displayName !== undefined) {
+          newUserData.displayName = firebaseUser.displayName;
+        }
+        if (firebaseUser.phoneNumber !== undefined) {
+          newUserData.phoneNumber = firebaseUser.phoneNumber;
+        }
+        if (firebaseUser.photoURL !== undefined) {
+          newUserData.photoURL = firebaseUser.photoURL;
+        }
+        if (additionalData?.firstName !== undefined) {
+          newUserData.firstName = additionalData.firstName;
+        }
+        if (additionalData?.lastName !== undefined) {
+          newUserData.lastName = additionalData.lastName;
+        }
+        if (additionalData?.companyId !== undefined) {
+          newUserData.companyId = additionalData.companyId;
+        }
+        if (additionalData?.metadata !== undefined) {
+          newUserData.metadata = additionalData.metadata;
+        }
+  
+        await this.db.collection('users').doc(firebaseUser.uid).set(newUserData);
         
         return {
-          ...newUser,
+          ...newUserData,
           createdAt: now.toDate(),
           updatedAt: now.toDate(),
           lastLoginAt: now.toDate()

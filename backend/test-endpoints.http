@@ -1,0 +1,44 @@
+### Health Check
+GET http://localhost:5001/health
+
+### API Base
+GET http://localhost:5001/api/v1
+
+### Test Invalid Token
+GET http://localhost:5001/api/v1/auth/verify-token
+Authorization: Bearer invalid-token
+
+### Test Login Validation
+POST http://localhost:5001/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "123"
+}
+
+### Test Valid Login Structure (will fail without Firebase user)
+POST http://localhost:5001/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@automore.co.za",
+  "password": "TestPass123!"
+}
+
+### Test Password Reset
+POST http://localhost:5001/api/v1/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "admin@automore.co.za"
+}
+
+### Test 404 Handler
+GET http://localhost:5001/api/v1/nonexistent
+
+### Test Malformed JSON
+POST http://localhost:5001/api/v1/auth/login
+Content-Type: application/json
+
+{invalid json}

@@ -1,0 +1,26 @@
+### Test authentication middleware without token
+GET http://localhost:5001/api/v1/auth/profile
+
+### Test authentication middleware with invalid token
+GET http://localhost:5001/api/v1/auth/profile
+Authorization: Bearer invalid-token-here
+
+### Test validation middleware
+PUT http://localhost:5001/api/v1/auth/profile
+Authorization: Bearer valid-firebase-token-here
+Content-Type: application/json
+
+{
+  "firstName": "",
+  "phoneNumber": "invalid-phone"
+}
+
+### Test rate limiting
+POST http://localhost:5001/api/v1/auth/change-password
+Authorization: Bearer valid-firebase-token-here
+Content-Type: application/json
+
+{
+  "currentPassword": "test",
+  "newPassword": "short"
+}
