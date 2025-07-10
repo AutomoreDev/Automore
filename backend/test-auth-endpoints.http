@@ -1,0 +1,43 @@
+### Health Check
+GET http://localhost:5001/health
+
+### API Base
+GET http://localhost:5001/api/v1
+
+### Test Firebase Token Verification (This will initially fail - that's expected)
+GET http://localhost:5001/api/v1/auth/verify-token
+Authorization: Bearer invalid-token
+
+### Test Rate Limiting on Login (Send multiple requests)
+POST http://localhost:5001/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "invalid@email.com",
+  "password": "wrongpassword"
+}
+
+### Test Login Validation Errors
+POST http://localhost:5001/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "123"
+}
+
+### Test Password Reset
+POST http://localhost:5001/api/v1/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "admin@automore.co.za"
+}
+
+### Test Refresh Token (will fail without valid token)
+POST http://localhost:5001/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "invalid-refresh-token"
+}
