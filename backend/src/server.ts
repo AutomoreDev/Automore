@@ -9,6 +9,13 @@ import path from 'path';
 // Import and initialize Firebase
 import { initializeFirebase } from './config/firebase';
 
+// Import middleware
+import { errorHandler } from './middleware/error/errorHandler';
+import { notFoundHandler } from './middleware/error/notFoundHandler';
+
+// Import routes
+import authRoutes from './routes/auth';
+
 // Load environment variables
 dotenv.config();
 
@@ -69,101 +76,31 @@ app.get(`/api/${API_VERSION}`, (req: Request, res: Response) => {
   });
 });
 
+// Authentication routes
+app.use(`/api/${API_VERSION}/auth`, authRoutes);
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'OK',
-    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    version: API_VERSION,
-    services: {
-      firebase: 'Connected',
-      api: 'Active'
-    }
+    firebase: 'Connected',
+    version: API_VERSION
   });
 });
 
-// Test Firebase connection endpoint
-app.get(`/api/${API_VERSION}/test-firebase`, async (req: Request, res: Response) => {
-  try {
-    const { getDb } = await import('./config/firebase');
-    const db = getDb();
-    
-    // Test Firestore connection
-    const testDoc = await db.collection('test').add({
-      message: 'API test successful',
-      timestamp: new Date()
-    });
-    
-    // Clean up test document
-    await testDoc.delete();
-    
-    res.json({
-      success: true,
-      message: 'Firebase connection successful',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Firebase test failed:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Firebase connection failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// 404 handler
-app.use('*', (req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: 'API endpoint not found',
-    path: req.originalUrl,
-    method: req.method,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Global error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error('Global error handler:', err);
-  
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && {
-      error: err.message,
-      stack: err.stack
-    }),
-    timestamp: new Date().toISOString()
-  });
-});
+// Error handling middleware (must be last)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log('\n🚀 ======================================');
-  console.log('   AUTOMORE PORTAL BACKEND STARTED');
-  console.log('  ======================================');
-  console.log(`🌐 Server running on port ${PORT}`);
+  console.log(`🚀 Automore Portal Backend running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api/${API_VERSION}`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-  console.log(`🔥 Firebase Test: http://localhost:${PORT}/api/${API_VERSION}/test-firebase`);
-  console.log(`🔥 Firebase Project: ${process.env.FIREBASE_PROJECT_ID}`);
-  console.log('======================================\n');
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('👋 SIGINT received, shutting down gracefully');
-  process.exit(0);
+  console.log(`🔥 Firebase initialized successfully`);
+  console.log(`📡 API Base URL: http://localhost:${PORT}/api/${API_VERSION}`);
+  console.log(`🔐 Auth endpoints available at: /api/${API_VERSION}/auth`);
 });
 
 export default app;

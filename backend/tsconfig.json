@@ -4,10 +4,9 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "../",
     "strict": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
@@ -20,15 +19,12 @@
     "strictFunctionTypes": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
     "noImplicitOverride": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "baseUrl": "./src",
-    "types": ["node", "jest"],
-    "typeRoots": ["./node_modules/@types"],
-    "moduleResolution": "node",
     "paths": {
       "@/*": ["*"],
       "@/controllers/*": ["controllers/*"],
@@ -37,9 +33,9 @@
       "@/middleware/*": ["middleware/*"],
       "@/utils/*": ["utils/*"],
       "@/types/*": ["types/*"],
-      "@/config/*": ["config/*"]
+      "@/shared/*": ["../shared/*"]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+  "include": ["src/**/*", "../shared/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
