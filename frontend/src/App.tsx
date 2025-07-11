@@ -1,58 +1,64 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { CssBaseline, Box } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import { theme } from '../src/styles/theme';
-import { AppLayout } from '../src/components/common/Layout/AppLayout';
-import { LandingPage } from '../src/pages/landing/LandingPage';
-
-// Create a client for React Query
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+import { AuthProvider } from './context/auth/AuthContext';
+import { theme } from './styles/theme';
+import { ProtectedRoute } from './components/auth/ProtectedRoute/ProtectedRoute';
+import { LoginForm } from './components/auth/LoginForm/LoginForm';
+import { RegisterForm } from './components/auth/SignupForm/SignupForm';
+import { DashboardRouter } from './components/dashboard/DashboardRouter/DashboardRouter';
+import { LandingPage } from './pages/landing/LandingPage';
+import { UnauthorizedPage } from './pages/ErrorPages/UnauthorizedPage';
+import { NotFoundPage } from './pages/ErrorPages/NotFoundPage';
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Router>
-          <Routes>
-            <Route 
-              path="/" 
-              element={
-                <AppLayout>
-                  <LandingPage />
-                </AppLayout>
-              } 
-            />
-            {/* Add more routes as you create them */}
-          </Routes>
-        </Router>
-        
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="dark"
-        />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <AuthProvider>
+          <Box sx={{ minHeight: '100vh' }}>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/auth/login" element={<LoginForm />} />
+              <Route path="/auth/register" element={<RegisterForm />} />
+              
+              {/* Protected Routes */}
+              <Route
+                path="/dashboard/*"
+                element={
+                  <ProtectedRoute>
+                    <DashboardRouter />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Error Pages */}
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
+              <Route path="/404" element={<NotFoundPage />} />
+              <Route path="*" element={<Navigate to="/404" replace />} />
+            </Routes>
+          </Box>
+          
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 
