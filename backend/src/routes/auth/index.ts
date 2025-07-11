@@ -1,10 +1,28 @@
 import { Router } from 'express';
 import { authController } from '../../controllers/auth/authController';
 import { firebaseAuthMiddleware, jwtAuthMiddleware } from '../../middleware/auth/authMiddleware';
-import { validateLoginRequest, validateRefreshTokenRequest, validateUpdateProfileRequest, validateChangePasswordRequest, validatePasswordResetRequest } from '../../middleware/validation/authValidation';
+import { 
+  validateLoginRequest, 
+  validateRegisterRequest,  // ADD THIS
+  validateRefreshTokenRequest, 
+  validateUpdateProfileRequest, 
+  validateChangePasswordRequest, 
+  validatePasswordResetRequest 
+} from '../../middleware/validation/authValidation';
 import { rateLimitMiddleware } from '../../middleware/security/rateLimitMiddleware';
 
 const router = Router();
+
+/**
+ * @route   POST /api/v1/auth/register
+ * @desc    Register new user and return JWT tokens
+ * @access  Public
+ */
+router.post('/register',
+  rateLimitMiddleware(3, 60), // 3 attempts per hour (stricter than login)
+  validateRegisterRequest,
+  authController.register
+);
 
 /**
  * @route   POST /api/v1/auth/login

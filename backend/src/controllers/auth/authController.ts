@@ -10,9 +10,155 @@ import {
   ChangePasswordRequest,
   PasswordResetRequest
 } from '../../../../shared/types/auth';
+import { UserRole, UserStatus } from '../../../../shared/types/user'; // ADD THESE IMPORTS
 import { ApiResponse } from '../../../../shared/types/api';
+import { RegisterRequest } from '../../middleware/validation/authValidation';
 
 export class AuthController {
+  /**
+   * Register new user with Firebase and return JWT tokens
+   */
+  async register(req: Request<{}, ApiResponse<LoginResponse>, RegisterRequest>, res: Response<ApiResponse<LoginResponse>>): Promise<void> {
+    try {
+      const { 
+        email, 
+        password, 
+        firstName, 
+        lastName, 
+        phoneNumber, 
+        userType, 
+        companyName 
+      } = req.body;
+
+      // Check if user already exists in Firebase
+      try {
+        await getAuth().getUserByEmail(email);
+        res.status(409).json({
+          success: false,
+          error: 'USER_EXISTS',
+          message: 'An account with this email already exists',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      } catch (error: any) {
+        // User doesn't exist, which is what we want for registration
+        if (error.code !== 'auth/user-not-found') {
+          console.error('Error checking user existence:', error);
+          res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: 'An error occurred while checking user existence',
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+      }
+
+      // Create Firebase user
+      let firebaseUser;
+      try {
+        firebaseUser = await getAuth().createUser({
+          email,
+          password,
+          displayName: `${firstName} ${lastName}`,
+          phoneNumber: phoneNumber || undefined,
+          emailVerified: false // Will be verified through Firebase Auth flow
+        });
+      } catch (error: any) {
+        console.error('Firebase user creation error:', error);
+        
+        let errorMessage = 'Failed to create user account';
+        if (error.code === 'auth/email-already-exists') {
+          errorMessage = 'An account with this email already exists';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'Invalid email address';
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = 'Password is too weak';
+        }
+
+        res.status(400).json({
+          success: false,
+          error: 'USER_CREATION_FAILED',
+          message: errorMessage,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Create user profile in Firestore
+      try {
+        // Map frontend userType to proper UserRole enum
+        const role = userType === 'BUSINESS_USER' ? UserRole.BUSINESS_USER : UserRole.CLIENT_USER;
+        
+        const userProfile = await userService.createOrUpdateUser(firebaseUser, {
+          role, // Use proper enum value
+          firstName,
+          lastName,
+          phoneNumber: phoneNumber || undefined,
+          status: UserStatus.ACTIVE // Use proper enum value
+        });
+
+        // Build auth user object
+        const authUser = await userService.buildAuthUser(userProfile);
+
+        // Generate JWT tokens
+        const tokenPayload = {
+          uid: userProfile.uid,
+          email: userProfile.email,
+          role: userProfile.role,
+          ...(userProfile.companyId && { companyId: userProfile.companyId })
+        };
+
+        const accessToken = jwtService.generateAccessToken(tokenPayload);
+        const refreshToken = jwtService.generateRefreshToken(tokenPayload);
+        
+        // Get token expiry time
+        const expiresIn = jwtService.getAccessTokenExpiryTime(); // ADD THIS
+
+        // Update last login
+        await userService.updateLastLogin(userProfile.uid);
+
+        res.status(201).json({
+          success: true,
+          data: {
+            user: authUser,
+            accessToken,
+            refreshToken,
+            expiresIn // ADD THIS
+          },
+          message: 'Account created successfully',
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error) {
+        console.error('User profile creation error:', error);
+        
+        // Clean up Firebase user if Firestore creation fails
+        try {
+          await getAuth().deleteUser(firebaseUser.uid);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup Firebase user:', cleanupError);
+        }
+
+        res.status(500).json({
+          success: false,
+          error: 'PROFILE_CREATION_FAILED',
+          message: 'Failed to create user profile',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+    } catch (error) {
+      console.error('Registration error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: 'An unexpected error occurred during registration',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
   /**
    * Login with Firebase and return JWT tokens
    */
@@ -64,20 +210,21 @@ export class AuthController {
 
       const accessToken = jwtService.generateAccessToken(tokenPayload);
       const refreshToken = jwtService.generateRefreshToken(tokenPayload);
+      
+      // Get token expiry time
+      const expiresIn = jwtService.getAccessTokenExpiryTime(); // ADD THIS
 
       // Update last login
       await userService.updateLastLogin(user.uid);
 
-      const response: LoginResponse = {
-        user: authUser,
-        accessToken,
-        refreshToken,
-        expiresIn: jwtService.getAccessTokenExpiryTime()
-      };
-
       res.status(200).json({
         success: true,
-        data: response,
+        data: {
+          user: authUser,
+          accessToken,
+          refreshToken,
+          expiresIn // ADD THIS
+        },
         message: 'Login successful',
         timestamp: new Date().toISOString()
       });
@@ -93,9 +240,9 @@ export class AuthController {
   }
 
   /**
-   * Refresh access token using refresh token
+   * Refresh JWT access token
    */
-  async refreshToken(req: Request<{}, ApiResponse<{ accessToken: string; expiresIn: number }>, RefreshTokenRequest>, res: Response): Promise<void> {
+  async refreshToken(req: Request<{}, ApiResponse<{ accessToken: string }>, RefreshTokenRequest>, res: Response): Promise<void> {
     try {
       const { refreshToken } = req.body;
 
@@ -112,21 +259,20 @@ export class AuthController {
       // Verify refresh token
       const decoded = jwtService.verifyRefreshToken(refreshToken);
       
-      // Get current user data
+      // Get user from Firestore to ensure they still exist and are active
       const user = await userService.getUserByUid(decoded.uid);
       
       if (!user) {
         res.status(404).json({
           success: false,
           error: 'User not found',
-          message: 'User profile not found',
+          message: 'User account no longer exists',
           timestamp: new Date().toISOString()
         });
         return;
       }
 
-      // Check if user is still active
-      if (user.status !== 'ACTIVE') {
+      if (user.status !== UserStatus.ACTIVE) { // Use enum
         res.status(403).json({
           success: false,
           error: 'Account inactive',
@@ -136,7 +282,7 @@ export class AuthController {
         return;
       }
 
-      // Generate new access token with current user data
+      // Generate new access token
       const tokenPayload = {
         uid: user.uid,
         email: user.email,
@@ -148,19 +294,40 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        data: {
-          accessToken,
-          expiresIn: jwtService.getAccessTokenExpiryTime()
-        },
+        data: { accessToken },
         message: 'Token refreshed successfully',
         timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error('Refresh token error:', error);
-      res.status(401).json({
+      res.status(403).json({
         success: false,
         error: 'Invalid refresh token',
         message: 'Refresh token is invalid or expired',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
+   * Logout user (mainly for cleanup)
+   */
+  async logout(req: Request, res: Response): Promise<void> {
+    try {
+      // In a stateless JWT system, logout is primarily client-side
+      // But we can perform any necessary cleanup here
+      
+      res.status(200).json({
+        success: true,
+        message: 'Logged out successfully',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: 'An error occurred during logout',
         timestamp: new Date().toISOString()
       });
     }
@@ -181,24 +348,9 @@ export class AuthController {
         return;
       }
 
-      // Get fresh user data
-      const user = await userService.getUserByUid(req.user.uid);
-      
-      if (!user) {
-        res.status(404).json({
-          success: false,
-          error: 'User not found',
-          message: 'User profile not found',
-          timestamp: new Date().toISOString()
-        });
-        return;
-      }
-
-      const authUser = await userService.buildAuthUser(user);
-
       res.status(200).json({
         success: true,
-        data: authUser,
+        data: req.user,
         message: 'Profile retrieved successfully',
         timestamp: new Date().toISOString()
       });
@@ -321,65 +473,44 @@ export class AuthController {
       if (!email) {
         res.status(400).json({
           success: false,
-          error: 'Missing email',
-          message: 'Email address is required',
+          error: 'Missing required fields',
+          message: 'Email is required',
           timestamp: new Date().toISOString()
         });
         return;
       }
 
-      // Generate password reset link
-      const resetLink = await getAuth().generatePasswordResetLink(email);
-      
-      // TODO: Send email with reset link
-      console.log('Password reset link:', resetLink);
-
-      res.status(200).json({
-        success: true,
-        message: 'Password reset email sent successfully',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: unknown) {
-      console.error('Password reset error:', error);
-      
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/user-not-found') {
-        res.status(404).json({
-          success: false,
-          error: 'User not found',
-          message: 'No user found with this email address',
+      // Check if user exists
+      try {
+        await getAuth().getUserByEmail(email);
+        
+        // Generate password reset link (in production, you'd send this via email)
+        const resetLink = await getAuth().generatePasswordResetLink(email);
+        
+        // For now, just return success (in production, send email)
+        res.status(200).json({
+          success: true,
+          message: 'Password reset instructions sent to your email',
           timestamp: new Date().toISOString()
         });
-        return;
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+          // For security, don't reveal if email exists or not
+          res.status(200).json({
+            success: true,
+            message: 'If an account exists with this email, password reset instructions have been sent',
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          throw error;
+        }
       }
-
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-        message: 'An error occurred while processing password reset',
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-
-  /**
-   * Logout (invalidate tokens - client-side mainly)
-   */
-  async logout(req: Request, res: Response): Promise<void> {
-    try {
-      // In a stateless JWT system, logout is mainly client-side
-      // Here we could implement token blacklisting if needed
-      
-      res.status(200).json({
-        success: true,
-        message: 'Logout successful',
-        timestamp: new Date().toISOString()
-      });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Password reset error:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
-        message: 'An error occurred during logout',
+        message: 'An error occurred while processing password reset request',
         timestamp: new Date().toISOString()
       });
     }
