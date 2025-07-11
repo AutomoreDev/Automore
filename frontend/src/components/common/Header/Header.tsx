@@ -1,3 +1,4 @@
+// frontend/src/components/common/Header/Header.tsx
 import React from 'react';
 import {
   AppBar,
@@ -8,16 +9,20 @@ import {
   useTheme,
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../hooks/auth/useAuth';
+import { useAuth } from '../../../context/auth/AuthContext'; // Updated import
 
 export const Header: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth(); // Updated to use logout instead of signOut
 
   const handleSignOut = async () => {
-    await signOut();
+    await logout();
     navigate('/');
+  };
+
+  const handleGetStarted = () => {
+    navigate('/auth/signup');
   };
 
   return (
@@ -73,8 +78,19 @@ export const Header: React.FC = () => {
               </Button>
               <Button 
                 variant="contained" 
-                component={Link} 
-                to="/auth/signup"
+                onClick={handleGetStarted}
+                sx={{
+                  px: 3,
+                  py: 1,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': {
+                    transform: 'translateY(-1px)',
+                    boxShadow: theme.shadows[4],
+                  },
+                  transition: 'all 0.2s ease'
+                }}
               >
                 Get Started
               </Button>
