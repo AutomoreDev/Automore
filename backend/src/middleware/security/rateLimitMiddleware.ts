@@ -12,21 +12,29 @@ interface RateLimitStore {
 const rateLimitStore: RateLimitStore = {};
 
 /**
- * Rate limiting middleware
+ * Development-friendly rate limiting middleware
  */
 export const rateLimitMiddleware = (maxAttempts: number, windowMinutes: number) => {
   return (req: Request, res: Response<ApiResponse>, next: NextFunction): void => {
+    // Skip rate limiting in development mode if flag is set
+    if (process.env.NODE_ENV === 'development' && process.env.SKIP_RATE_LIMIT === 'true') {
+      console.log('🚦 Rate limiting skipped (development mode)');
+      return next();
+    }
+
     const key = `${req.ip}:${req.path}`;
     const now = Date.now();
     const windowMs = windowMinutes * 60 * 1000;
 
-    // Clean up expired entries
-    Object.keys(rateLimitStore).forEach(storeKey => {
-      const entry = rateLimitStore[storeKey];
-      if (entry && entry.resetTime < now) {
-        delete rateLimitStore[storeKey];
-      }
-    });
+    // Clean up expired entries periodically
+    if (Math.random() < 0.01) {
+      Object.keys(rateLimitStore).forEach(storeKey => {
+        const entry = rateLimitStore[storeKey];
+        if (entry && entry.resetTime < now) {
+          delete rateLimitStore[storeKey];
+        }
+      });
+    }
 
     // Get current rate limit data
     let rateLimit = rateLimitStore[key];
@@ -53,6 +61,8 @@ export const rateLimitMiddleware = (maxAttempts: number, windowMinutes: number) 
       // Rate limit exceeded
       const resetIn = Math.ceil((rateLimit.resetTime - now) / 1000);
       
+      console.log(`🚦 Rate limit exceeded for ${req.ip} on ${req.path}`);
+      
       res.status(429).json({
         success: false,
         error: 'RATE_LIMIT_EXCEEDED',
@@ -70,7 +80,7 @@ export const rateLimitMiddleware = (maxAttempts: number, windowMinutes: number) 
 };
 
 /**
- * Create rate limiter for specific endpoints
+ * Create development-friendly rate limiter for specific endpoints
  */
 export const createRateLimiter = (
   endpoint: string,
@@ -78,6 +88,11 @@ export const createRateLimiter = (
   windowMinutes: number
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
+    // Skip rate limiting in development mode if flag is set
+    if (process.env.NODE_ENV === 'development' && process.env.SKIP_RATE_LIMIT === 'true') {
+      return next();
+    }
+
     const key = `${req.ip}:${endpoint}`;
     const now = Date.now();
     const windowMs = windowMinutes * 60 * 1000;
@@ -109,7 +124,33 @@ export const createRateLimiter = (
   };
 };
 
-// Pre-configured rate limiters
-export const loginRateLimit = createRateLimiter('login', 5, 15);
-export const passwordResetRateLimit = createRateLimiter('password-reset', 3, 60);
-export const changePasswordRateLimit = createRateLimiter('change-password', 3, 60);
+// More lenient rate limiters for development
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+export const loginRateLimit = createRateLimiter(
+  'login', 
+  isDevelopment ? 50 : 5,  // 50 attempts in dev, 5 in prod
+  isDevelopment ? 1 : 15   // 1 minute window in dev, 15 in prod
+);
+
+export const passwordResetRateLimit = createRateLimiter(
+  'password-reset', 
+  isDevelopment ? 20 : 3,  // 20 attempts in dev, 3 in prod
+  isDevelopment ? 1 : 60   // 1 minute window in dev, 60 in prod
+);
+
+export const changePasswordRateLimit = createRateLimiter(
+  'change-password', 
+  isDevelopment ? 20 : 3,  // 20 attempts in dev, 3 in prod
+  isDevelopment ? 1 : 60   // 1 minute window in dev, 60 in prod
+);
+
+/**
+ * Clear all rate limit data (useful for testing)
+ */
+export const clearRateLimitStore = () => {
+  Object.keys(rateLimitStore).forEach(key => {
+    delete rateLimitStore[key];
+  });
+  console.log('🧹 Rate limit store cleared');
+};

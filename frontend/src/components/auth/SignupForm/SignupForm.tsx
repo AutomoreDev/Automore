@@ -1,3 +1,4 @@
+// frontend/src/components/auth/SignupForm/SignupForm.tsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -16,7 +17,8 @@ import {
   Radio,
   Stepper,
   Step,
-  StepLabel
+  StepLabel,
+  Alert
 } from '@mui/material';
 import { Visibility, VisibilityOff, Person, Email, Lock, Business, Phone } from '@mui/icons-material';
 import { useAuth } from '../../../context/auth/AuthContext';
@@ -32,7 +34,7 @@ const schema = yup.object({
   confirmPassword: yup.string()
     .oneOf([yup.ref('password')], 'Passwords must match')
     .required('Please confirm your password'),
-  phoneNumber: yup.string().required('Phone number is required').matches(/^\+27[0-9]{9}$/, 'Enter valid SA phone number (+27xxxxxxxxx)'),
+  phoneNumber: yup.string().required('Phone number is required').matches(/^\+27[0-9]{9}$/, 'Enter valid SA phone number (+27 followed by 9 digits, e.g., +27821234567)'),
   userType: yup.string().oneOf(['BUSINESS_USER', 'CLIENT_USER']).required('Please select account type'),
   companyName: yup.string().when('userType', {
     is: 'BUSINESS_USER',
@@ -45,12 +47,13 @@ type RegisterFormData = yup.InferType<typeof schema>;
 
 const steps = ['Account Type', 'Personal Details', 'Account Setup'];
 
-export const RegisterForm: React.FC = () => {
+export const SignupForm: React.FC = () => {
   const navigate = useNavigate();
   const { register: registerUser, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -58,37 +61,89 @@ export const RegisterForm: React.FC = () => {
     watch,
     control,
     formState: { errors, isValid },
-    trigger
+    trigger,
+    setError,
   } = useForm<RegisterFormData>({
     resolver: yupResolver(schema) as any,
-    mode: 'onChange',
-    defaultValues: {
-      userType: 'BUSINESS_USER'
-    }
+    mode: 'onChange'
   });
 
   const userType = watch('userType');
 
   const handleNext = async () => {
-    const isStepValid = await trigger();
+    let fieldsToValidate: (keyof RegisterFormData)[] = [];
+    
+    switch (activeStep) {
+      case 0:
+        fieldsToValidate = ['userType'];
+        break;
+      case 1:
+        fieldsToValidate = ['firstName', 'lastName', 'email', 'phoneNumber'];
+        if (userType === 'BUSINESS_USER') {
+          fieldsToValidate.push('companyName');
+        }
+        break;
+      case 2:
+        fieldsToValidate = ['password', 'confirmPassword'];
+        break;
+    }
+
+    const isStepValid = await trigger(fieldsToValidate);
     if (isStepValid) {
-      setActiveStep((prevStep) => prevStep + 1);
+      setActiveStep((prev) => prev + 1);
     }
   };
 
   const handleBack = () => {
-    setActiveStep((prevStep) => prevStep - 1);
+    setActiveStep((prev) => prev - 1);
   };
 
   const onSubmit = async (data: RegisterFormData) => {
-    const success = await registerUser({
-      ...data,
-      phoneNumber: data.phoneNumber || undefined,
-      companyName: data.companyName || undefined
-    });
-    
-    if (success) {
-      navigate('/dashboard');
+    try {
+      setSubmitError(null);
+      
+      // Send all required fields that match your backend validation
+      const registerData = {
+        email: data.email,
+        password: data.password,
+        confirmPassword: data.confirmPassword, // ✅ ADD THIS - required by backend
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
+        userType: data.userType as 'BUSINESS_USER' | 'CLIENT_USER',
+        companyName: data.companyName || undefined
+      };
+
+      console.log('Sending registration data:', registerData); // Debug log
+
+      const success = await registerUser(registerData);
+      
+      if (success) {
+        navigate('/dashboard', { replace: true });
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      
+      // Handle different types of errors
+      if (error.response?.data?.errors) {
+        // Backend validation errors
+        const backendErrors = error.response.data.errors;
+        setSubmitError(`Validation errors: ${backendErrors.map((e: any) => e.message).join(', ')}`);
+        
+        // Set specific field errors
+        backendErrors.forEach((err: any) => {
+          if (err.field) {
+            setError(err.field as keyof RegisterFormData, {
+              type: 'manual',
+              message: err.message
+            });
+          }
+        });
+      } else if (error.response?.data?.message) {
+        setSubmitError(error.response.data.message);
+      } else {
+        setSubmitError(error.message || 'Registration failed. Please try again.');
+      }
     }
   };
 
@@ -96,17 +151,20 @@ export const RegisterForm: React.FC = () => {
     switch (step) {
       case 0:
         return (
-          <Box sx={{ textAlign: 'center' }}>
+          <Box>
             <Typography variant="h6" gutterBottom>
-              What type of account do you need?
+              Select your account type
             </Typography>
             <Controller
               name="userType"
               control={control}
               render={({ field }) => (
-                <FormControl component="fieldset" sx={{ mt: 2 }}>
-                  <RadioGroup {...field} row>
-                    <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                <FormControl component="fieldset" error={!!errors.userType}>
+                  <RadioGroup
+                    {...field}
+                    sx={{ mt: 2 }}
+                  >
+                    <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
                       <Paper
                         elevation={field.value === 'BUSINESS_USER' ? 3 : 1}
                         sx={{
@@ -125,12 +183,13 @@ export const RegisterForm: React.FC = () => {
                             <Box sx={{ textAlign: 'left' }}>
                               <Typography variant="h6">Business Account</Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Manage clients, projects, and invoices
+                                For companies offering automation services
                               </Typography>
                             </Box>
                           }
                         />
                       </Paper>
+
                       <Paper
                         elevation={field.value === 'CLIENT_USER' ? 3 : 1}
                         sx={{
@@ -149,7 +208,7 @@ export const RegisterForm: React.FC = () => {
                             <Box sx={{ textAlign: 'left' }}>
                               <Typography variant="h6">Client Account</Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Track projects and manage tickets
+                                For businesses seeking automation solutions
                               </Typography>
                             </Box>
                           }
@@ -176,14 +235,12 @@ export const RegisterForm: React.FC = () => {
                 label="First Name"
                 error={!!errors.firstName}
                 helperText={errors.firstName?.message}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Person color="action" />
-                      </InputAdornment>
-                    ),
-                  },
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person color="action" />
+                    </InputAdornment>
+                  ),
                 }}
               />
               <TextField
@@ -203,14 +260,12 @@ export const RegisterForm: React.FC = () => {
               error={!!errors.email}
               helperText={errors.email?.message}
               sx={{ mb: 2 }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email color="action" />
-                    </InputAdornment>
-                  ),
-                },
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Email color="action" />
+                  </InputAdornment>
+                ),
               }}
             />
 
@@ -220,16 +275,14 @@ export const RegisterForm: React.FC = () => {
               label="Phone Number"
               placeholder="+27821234567"
               error={!!errors.phoneNumber}
-              helperText={errors.phoneNumber?.message || "South African format: +27xxxxxxxxx"}
+              helperText={errors.phoneNumber?.message || "Format: +27 followed by 9 digits (e.g., +27821234567)"}
               sx={{ mb: 2 }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Phone color="action" />
-                    </InputAdornment>
-                  ),
-                },
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Phone color="action" />
+                  </InputAdornment>
+                ),
               }}
             />
 
@@ -240,15 +293,12 @@ export const RegisterForm: React.FC = () => {
                 label="Company Name"
                 error={!!errors.companyName}
                 helperText={errors.companyName?.message}
-                sx={{ mb: 2 }}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Business color="action" />
-                      </InputAdornment>
-                    ),
-                  },
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Business color="action" />
+                    </InputAdornment>
+                  ),
                 }}
               />
             )}
@@ -269,24 +319,22 @@ export const RegisterForm: React.FC = () => {
               error={!!errors.password}
               helperText={errors.password?.message}
               sx={{ mb: 2 }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Lock color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
               }}
             />
 
@@ -297,25 +345,22 @@ export const RegisterForm: React.FC = () => {
               type={showConfirmPassword ? 'text' : 'password'}
               error={!!errors.confirmPassword}
               helperText={errors.confirmPassword?.message}
-              sx={{ mb: 2 }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        edge="end"
-                      >
-                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Lock color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
               }}
             />
           </Box>
@@ -327,34 +372,12 @@ export const RegisterForm: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        p: 2
-      }}
-    >
-      <Paper
-        elevation={24}
-        sx={{
-          p: 4,
-          width: '100%',
-          maxWidth: 600,
-          borderRadius: 3
-        }}
-      >
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Typography variant="h4" fontWeight="bold" color="primary" gutterBottom>
-            Join Automore
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Create your account in just a few steps
-          </Typography>
-        </Box>
-
+    <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
+      <Paper elevation={3} sx={{ p: 4 }}>
+        <Typography variant="h4" align="center" gutterBottom>
+          Create Your Account
+        </Typography>
+        
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
           {steps.map((label) => (
             <Step key={label}>
@@ -363,18 +386,26 @@ export const RegisterForm: React.FC = () => {
           ))}
         </Stepper>
 
-        <form onSubmit={handleSubmit(onSubmit as any)} noValidate>
-          {renderStepContent(activeStep)}
+        <form onSubmit={handleSubmit(onSubmit as any)}>
+          <Box sx={{ minHeight: 300, mb: 4 }}>
+            {renderStepContent(activeStep)}
+          </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+          {/* Error Display */}
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {submitError}
+            </Alert>
+          )}
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Button
-              disabled={activeStep === 0}
               onClick={handleBack}
-              sx={{ mr: 1 }}
+              disabled={activeStep === 0}
             >
               Back
             </Button>
-            <Box sx={{ flex: '1 1 auto' }} />
+
             {activeStep === steps.length - 1 ? (
               <Button
                 type="submit"

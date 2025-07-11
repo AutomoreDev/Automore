@@ -4,11 +4,12 @@ import { AuthUser, LoginRequest, LoginResponse } from '../../../../shared/types/
 export interface RegisterRequest {
   email: string;
   password: string;
+  confirmPassword: string; 
   firstName: string;
   lastName: string;
-  phoneNumber?: string;
-  companyName?: string;
+  phoneNumber: string;
   userType: 'BUSINESS_USER' | 'CLIENT_USER';
+  companyName?: string;
 }
 
 export const authApi = {
