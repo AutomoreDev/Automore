@@ -49,11 +49,46 @@ echo "==============================================="
 test_endpoint "GET" "http://localhost:5001/health" "" "Health Check" "200"
 test_endpoint "GET" "http://localhost:5001/api/v1" "" "API Base Endpoint" "200"
 
-# Phase 2: Authentication Endpoint Testing
-echo "🔐 Phase 2: Authentication Endpoint Testing"
-echo "==========================================="
+# Phase 2: Registration Endpoint Testing
+echo "🔐 Phase 2: Registration Endpoint Testing"
+echo "========================================="
 
-# Test validation errors
+# Test registration validation errors
+test_endpoint "POST" "http://localhost:5001/api/v1/auth/register" \
+    '{"email": "invalid-email", "password": "123"}' \
+    "Registration Validation Errors" "422"
+
+# Test valid registration
+test_endpoint "POST" "http://localhost:5001/api/v1/auth/register" \
+    '{
+        "email": "newuser@automore-test.com",
+        "password": "NewUserPass123",
+        "confirmPassword": "NewUserPass123",
+        "firstName": "New",
+        "lastName": "User",
+        "phoneNumber": "+27821112233",
+        "userType": "CLIENT_USER"
+    }' \
+    "Valid User Registration" "201"
+
+# Test duplicate registration
+test_endpoint "POST" "http://localhost:5001/api/v1/auth/register" \
+    '{
+        "email": "newuser@automore-test.com",
+        "password": "AnotherPass123",
+        "confirmPassword": "AnotherPass123",
+        "firstName": "Duplicate",
+        "lastName": "User",
+        "phoneNumber": "+27821112234",
+        "userType": "CLIENT_USER"
+    }' \
+    "Duplicate Email Registration" "409"
+
+# Phase 3: Login Endpoint Testing
+echo "🔐 Phase 3: Login Endpoint Testing"
+echo "=================================="
+
+# Test login validation errors
 test_endpoint "POST" "http://localhost:5001/api/v1/auth/login" \
     '{"email": "invalid-email", "password": "123"}' \
     "Login Validation Errors" "422"
@@ -62,6 +97,11 @@ test_endpoint "POST" "http://localhost:5001/api/v1/auth/login" \
 test_endpoint "POST" "http://localhost:5001/api/v1/auth/login" \
     '{"email": "admin@automore.co.za", "password": "TestPass123!"}' \
     "Valid Login Structure" "401"
+
+# Test login with newly registered user
+test_endpoint "POST" "http://localhost:5001/api/v1/auth/login" \
+    '{"email": "newuser@automore-test.com", "password": "NewUserPass123"}' \
+    "Login with New User" "200"
 
 # Test password reset
 test_endpoint "POST" "http://localhost:5001/api/v1/auth/reset-password" \
@@ -77,8 +117,8 @@ test_endpoint "POST" "http://localhost:5001/api/v1/auth/refresh" \
     '{"refreshToken": "invalid-refresh-token"}' \
     "Refresh Token (Invalid)" "401"
 
-# Phase 3: Error Handling & Edge Cases
-echo "⚠️  Phase 3: Error Handling & Edge Cases"
+# Phase 4: Error Handling & Edge Cases
+echo "⚠️  Phase 4: Error Handling & Edge Cases"
 echo "========================================"
 
 test_endpoint "GET" "http://localhost:5001/api/v1/nonexistent" "" \
@@ -103,8 +143,8 @@ fi
 echo "   Response: $body"
 echo ""
 
-# Phase 4: Rate Limiting Test
-echo "🚦 Phase 4: Rate Limiting Test"
+# Phase 5: Rate Limiting Test
+echo "🚦 Phase 5: Rate Limiting Test"
 echo "=============================="
 
 echo "Sending 6 rapid requests to test rate limiting..."
@@ -132,8 +172,8 @@ done
 
 echo ""
 
-# Phase 5: Protected Routes (without valid tokens)
-echo "🛡️  Phase 5: Protected Routes Testing"
+# Phase 6: Protected Routes (without valid tokens)
+echo "🛡️  Phase 6: Protected Routes Testing"
 echo "===================================="
 
 test_endpoint "GET" "http://localhost:5001/api/v1/auth/profile" "" \
@@ -142,15 +182,19 @@ test_endpoint "GET" "http://localhost:5001/api/v1/auth/profile" "" \
 # Summary
 echo "📋 Test Summary"
 echo "==============="
-echo "All tests completed. Check the results above."
 echo "✅ = Test passed (got expected response)"
 echo "❌ = Test failed (unexpected response)"
 echo ""
-echo "Expected results for a working auth system:"
-echo "- Health check: 200 OK"
-echo "- API base: 200 OK"
-echo "- Validation errors: 422 with detailed error messages"
-echo "- Invalid auth: 401 Unauthorized"
-echo "- 404 handler: 404 Not Found"
-echo "- Rate limiting: 429 after 5 attempts"
-echo "- Protected routes: 401 without valid token"
+echo "🎯 Key Findings:"
+echo "- Server health: Should be EXCELLENT"
+echo "- Registration endpoint: Should be WORKING"
+echo "- Login functionality: Should be WORKING"
+echo "- Input validation: Should be WORKING"
+echo "- Security measures: Should be WORKING"
+echo "- Rate limiting: Should be WORKING"
+echo "- Error handling: Should be WORKING"
+echo ""
+echo "🚀 Next Steps:"
+echo "1. Verify users appear in Firebase Console"
+echo "2. Test frontend registration form"
+echo "3. Proceed to Support Ticket System development"
