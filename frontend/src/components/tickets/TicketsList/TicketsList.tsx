@@ -33,7 +33,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { AppLayout } from '../../common/Layout/AppLayout';
-import { useTickets } from '../../../hooks/ticket/useTickets';
+import { useTickets } from '../../../hooks/tickets/useTickets';
 import {
   Ticket,
   TicketStatus,

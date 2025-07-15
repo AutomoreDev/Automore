@@ -7,11 +7,8 @@ import {
   UpdateTicketForm,
   CreateMessageForm,
   TicketQueryParams,
-  PaginatedTickets,
   TicketStatistics,
   TicketMessage,
-  TicketFilters,
-  TicketSortOptions
 } from '../../types/ticket';
 import { toast } from 'react-toastify';
 
