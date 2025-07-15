@@ -102,20 +102,36 @@ export const LoginForm: React.FC = () => {
           transition={{ duration: 0.5 }}
         >
           <Paper
-            elevation={4}
+            elevation={8}
             sx={{
               p: 4,
               borderRadius: 3,
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+              backgroundColor: theme.palette.background.paper,
+              border: `1px solid ${theme.palette.divider}`,
+              boxShadow: theme.shadows[8],
             }}
           >
             {/* Header */}
             <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <RocketLaunch sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h4" fontWeight={700} color="primary" gutterBottom>
+              <RocketLaunch 
+                sx={{ 
+                  fontSize: 48, 
+                  color: theme.palette.primary.main, 
+                  mb: 2 
+                }} 
+              />
+              <Typography 
+                variant="h4" 
+                fontWeight={700} 
+                color="primary" 
+                gutterBottom
+              >
                 Welcome Back
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography 
+                variant="body1" 
+                color="text.secondary"
+              >
                 Sign in to your Automore account
               </Typography>
             </Box>
@@ -129,7 +145,21 @@ export const LoginForm: React.FC = () => {
                 type="email"
                 error={!!errors.email}
                 helperText={errors.email?.message}
-                sx={{ mb: 3 }}
+                sx={{ 
+                  mb: 3,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    '& fieldset': {
+                      borderColor: theme.palette.divider,
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -146,7 +176,21 @@ export const LoginForm: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 error={!!errors.password}
                 helperText={errors.password?.message}
-                sx={{ mb: 3 }}
+                sx={{ 
+                  mb: 3,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    '& fieldset': {
+                      borderColor: theme.palette.divider,
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -158,6 +202,7 @@ export const LoginForm: React.FC = () => {
                       <IconButton
                         onClick={() => setShowPassword(!showPassword)}
                         edge="end"
+                        sx={{ color: theme.palette.text.secondary }}
                       >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
@@ -167,8 +212,22 @@ export const LoginForm: React.FC = () => {
               />
 
               <FormControlLabel
-                control={<Checkbox {...register('rememberMe')} />}
-                label="Remember me"
+                control={
+                  <Checkbox 
+                    {...register('rememberMe')} 
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      '&.Mui-checked': {
+                        color: theme.palette.primary.main,
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" color="text.secondary">
+                    Remember me
+                  </Typography>
+                }
                 sx={{ mb: 3 }}
               />
 
@@ -184,10 +243,24 @@ export const LoginForm: React.FC = () => {
                   borderRadius: 2,
                   textTransform: 'none',
                   mb: 3,
+                  backgroundColor: theme.palette.primary.main,
+                  '&:hover': {
+                    backgroundColor: theme.palette.primary.dark,
+                    transform: 'translateY(-1px)',
+                    boxShadow: `0 6px 20px ${theme.palette.primary.main}40`,
+                  },
+                  '&:disabled': {
+                    backgroundColor: theme.palette.action.disabled,
+                    color: theme.palette.action.disabled,
+                  },
+                  transition: 'all 0.2s ease-in-out',
                 }}
               >
                 {loading ? (
-                  <CircularProgress size={24} color="inherit" />
+                  <CircularProgress 
+                    size={24} 
+                    sx={{ color: theme.palette.primary.contrastText }}
+                  />
                 ) : (
                   'Sign In'
                 )}
@@ -196,17 +269,32 @@ export const LoginForm: React.FC = () => {
 
             {/* Links */}
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography 
+                variant="body2" 
+                color="text.secondary" 
+                sx={{ mb: 2 }}
+              >
                 Don't have an account?{' '}
-                <Link to="/auth/signup" style={{ textDecoration: 'none' }}>
-                  <Typography component="span" color="primary" fontWeight="bold">
-                    Sign up here
-                  </Typography>
+                <Link 
+                  to="/auth/signup" 
+                  style={{ 
+                    textDecoration: 'none',
+                    color: theme.palette.primary.main,
+                    fontWeight: 600,
+                  }}
+                >
+                  Sign up here
                 </Link>
               </Typography>
               
-              <Link to="/auth/forgot-password" style={{ textDecoration: 'none' }}>
-                <Typography variant="body2" color="primary">
+              <Link 
+                to="/auth/forgot-password" 
+                style={{ 
+                  textDecoration: 'none',
+                  color: theme.palette.primary.main,
+                }}
+              >
+                <Typography variant="body2">
                   Forgot your password?
                 </Typography>
               </Link>

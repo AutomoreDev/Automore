@@ -1,3 +1,4 @@
+// backend/src/middleware/security/rateLimitMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import { ApiResponse } from '../../../../shared/types/api';
 
@@ -93,7 +94,9 @@ export const createRateLimiter = (
       return next();
     }
 
-    const key = `${req.ip}:${endpoint}`;
+    // Use user ID if available, otherwise fall back to IP
+    const userId = (req.user as any)?.uid;
+    const key = userId ? `${userId}:${endpoint}` : `${req.ip}:${endpoint}`;
     const now = Date.now();
     const windowMs = windowMinutes * 60 * 1000;
 
@@ -127,6 +130,8 @@ export const createRateLimiter = (
 // More lenient rate limiters for development
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+// ==================== EXISTING AUTH RATE LIMITERS ====================
+
 export const loginRateLimit = createRateLimiter(
   'login', 
   isDevelopment ? 50 : 5,  // 50 attempts in dev, 5 in prod
@@ -145,6 +150,100 @@ export const changePasswordRateLimit = createRateLimiter(
   isDevelopment ? 1 : 60   // 1 minute window in dev, 60 in prod
 );
 
+// ==================== NEW TICKET SYSTEM RATE LIMITERS ====================
+
+/**
+ * Rate limiter for ticket creation
+ * Prevents spam ticket creation
+ */
+export const ticketCreationRateLimit = createRateLimiter(
+  'ticket-creation',
+  isDevelopment ? 50 : 10,  // 50 tickets in dev, 10 in prod
+  isDevelopment ? 1 : 15    // 1 minute window in dev, 15 in prod
+);
+
+/**
+ * Rate limiter for ticket messages
+ * Prevents spam messaging in tickets
+ */
+export const ticketMessagesRateLimit = createRateLimiter(
+  'ticket-messages',
+  isDevelopment ? 100 : 20, // 100 messages in dev, 20 in prod
+  isDevelopment ? 1 : 5     // 1 minute window in dev, 5 in prod
+);
+
+/**
+ * Rate limiter for file uploads
+ * Prevents excessive file upload attempts
+ */
+export const fileUploadRateLimit = createRateLimiter(
+  'file-upload',
+  isDevelopment ? 100 : 30, // 100 uploads in dev, 30 in prod
+  isDevelopment ? 1 : 10    // 1 minute window in dev, 10 in prod
+);
+
+/**
+ * Rate limiter for ticket updates
+ * Prevents rapid ticket status changes
+ */
+export const ticketUpdateRateLimit = createRateLimiter(
+  'ticket-update',
+  isDevelopment ? 100 : 50, // 100 updates in dev, 50 in prod
+  isDevelopment ? 1 : 5     // 1 minute window in dev, 5 in prod
+);
+
+/**
+ * Rate limiter for ticket searches/listings
+ * Prevents API abuse for ticket queries
+ */
+export const ticketQueryRateLimit = createRateLimiter(
+  'ticket-query',
+  isDevelopment ? 200 : 100, // 200 queries in dev, 100 in prod
+  isDevelopment ? 1 : 1      // 1 minute window both dev and prod
+);
+
+// ==================== ADMIN OPERATION RATE LIMITERS ====================
+
+/**
+ * Strict rate limiter for sensitive admin operations
+ */
+export const adminOperationRateLimit = createRateLimiter(
+  'admin-operation',
+  isDevelopment ? 20 : 5,   // 20 operations in dev, 5 in prod
+  isDevelopment ? 1 : 60    // 1 minute window in dev, 60 in prod
+);
+
+/**
+ * Rate limiter for bulk operations
+ */
+export const bulkOperationRateLimit = createRateLimiter(
+  'bulk-operation',
+  isDevelopment ? 10 : 3,   // 10 operations in dev, 3 in prod
+  isDevelopment ? 1 : 60    // 1 minute window in dev, 60 in prod
+);
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Skip rate limiting for system admins
+ */
+export const createRateLimiterWithAdminSkip = (
+  endpoint: string,
+  maxAttempts: number,
+  windowMinutes: number
+) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    // Skip rate limiting for system admins
+    const user = req.user as any;
+    if (user?.role === 'SYSTEM_ADMIN') {
+      return next();
+    }
+
+    // Use the existing rate limiter
+    return createRateLimiter(endpoint, maxAttempts, windowMinutes)(req, res, next);
+  };
+};
+
 /**
  * Clear all rate limit data (useful for testing)
  */
@@ -153,4 +252,35 @@ export const clearRateLimitStore = () => {
     delete rateLimitStore[key];
   });
   console.log('🧹 Rate limit store cleared');
+};
+
+/**
+ * Get current rate limit status for a key
+ */
+export const getRateLimitStatus = (ip: string, endpoint: string) => {
+  const key = `${ip}:${endpoint}`;
+  const rateLimit = rateLimitStore[key];
+  
+  if (!rateLimit || rateLimit.resetTime < Date.now()) {
+    return { count: 0, resetTime: null, isExceeded: false };
+  }
+  
+  return {
+    count: rateLimit.count,
+    resetTime: new Date(rateLimit.resetTime),
+    isExceeded: false // You'd need to pass maxAttempts to determine this
+  };
+};
+
+/**
+ * Development helper: Log all active rate limits
+ */
+export const logActiveRateLimits = () => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🚦 Active Rate Limits:');
+    Object.entries(rateLimitStore).forEach(([key, data]) => {
+      const resetIn = Math.ceil((data.resetTime - Date.now()) / 1000);
+      console.log(`  ${key}: ${data.count} requests, resets in ${resetIn}s`);
+    });
+  }
 };

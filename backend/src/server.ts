@@ -16,6 +16,9 @@ import { notFoundHandler } from './middleware/error/notFoundHandler';
 // Import routes
 import authRoutes from './routes/auth';
 
+// Tickets
+import ticketRoutes from './routes/ticket/ticketRoutes';
+
 // Load environment variables
 dotenv.config();
 
@@ -78,6 +81,8 @@ app.get(`/api/${API_VERSION}`, (req: Request, res: Response) => {
 
 // Authentication routes
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
+// Ticket routes
+app.use(`/api/${API_VERSION}/tickets`, ticketRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
