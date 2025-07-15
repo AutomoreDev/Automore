@@ -1,6 +1,6 @@
-import React from 'react';
-import { Box, Container, useTheme } from '@mui/material';
-import { Header } from '../Header/Header';
+// frontend/src/components/common/Layout/AppLayout.tsx
+import React, { useState } from 'react';
+import { Box, useTheme, useMediaQuery } from '@mui/material';
 import { Sidebar } from '../Sidebar/Sidebar';
 
 interface AppLayoutProps {
@@ -10,9 +10,29 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ 
   children, 
-  showSidebar = false 
+  showSidebar = true 
 }) => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // On mobile, start collapsed. On desktop, start expanded.
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  if (!showSidebar) {
+    return (
+      <Box sx={{ 
+        minHeight: '100vh',
+        backgroundColor: theme.palette.background.default,
+        p: 0
+      }}>
+        {children}
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ 
@@ -20,25 +40,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       minHeight: '100vh',
       backgroundColor: theme.palette.background.default 
     }}>
-      {showSidebar && <Sidebar />}
+      <Sidebar 
+        open={sidebarOpen} 
+        onToggle={handleSidebarToggle}
+      />
       
       <Box sx={{ 
         flexGrow: 1,
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        transition: theme.transitions.create(['margin'], {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.enteringScreen,
+        }),
+        overflow: 'hidden',
       }}>
-        <Header />
-        
-        <Container 
-          maxWidth="xl" 
-          sx={{ 
-            flexGrow: 1, 
-            py: 3,
-            px: { xs: 2, sm: 3 }
-          }}
-        >
+        <Box sx={{ 
+          flexGrow: 1, 
+          p: { xs: 2, sm: 3 },
+          overflow: 'auto',
+        }}>
           {children}
-        </Container>
+        </Box>
       </Box>
     </Box>
   );

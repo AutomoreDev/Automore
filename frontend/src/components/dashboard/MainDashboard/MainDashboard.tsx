@@ -1,7 +1,7 @@
+// frontend/src/components/dashboard/MainDashboard/MainDashboard.tsx
 import React from 'react';
 import {
   Box,
-  Container,
   Typography,
   Card,
   CardContent,
@@ -9,216 +9,158 @@ import {
   Paper,
   Avatar,
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow
+  useTheme,
 } from '@mui/material';
 import {
-  Dashboard,
   Business,
   People,
   TrendingUp,
-  AttachMoney,
-  Add,
   Analytics,
-  Settings
+  Add,
+  Assessment,
 } from '@mui/icons-material';
 import { useAuth } from '../../../context/auth/AuthContext';
+import { AppLayout } from '../../common/Layout/AppLayout';
 
-// Automore platform-wide statistics
+// Remove dummy data - these will be loaded from API
 const platformStats = [
-  { label: 'Partner Companies', value: '47', icon: <Business />, color: 'primary', growth: '+12%' },
-  { label: 'Total End Clients', value: '312', icon: <People />, color: 'success', growth: '+28%' },
-  { label: 'Monthly Recurring Revenue', value: 'R485,200', icon: <AttachMoney />, color: 'info', growth: '+15%' },
-  { label: 'Platform Health', value: '99.2%', icon: <TrendingUp />, color: 'warning', growth: '+0.1%' }
-];
-
-// Top partner companies by revenue
-const topPartners = [
-  { name: 'Digital Solutions SA', clients: 23, revenue: 'R45,600', growth: '+18%' },
-  { name: 'Cape Town Consulting', clients: 18, revenue: 'R38,200', growth: '+22%' },
-  { name: 'JHB Tech Partners', clients: 15, revenue: 'R32,100', growth: '+8%' },
-  { name: 'Innovation Hub', clients: 12, revenue: 'R28,800', growth: '+35%' }
-];
-
-const systemActivity = [
-  'New partner "Stellenbosch Solutions" onboarded',
-  'Monthly revenue target exceeded by 15%',
-  'System upgraded - improved performance by 12%',
-  'Partner "Digital Solutions SA" added 3 new clients',
-  'Payment gateway integration optimized'
+  { label: 'Total Partners', value: '--', icon: <Business />, color: 'primary' as const, trend: '--' },
+  { label: 'Total Clients', value: '--', icon: <People />, color: 'success' as const, trend: '--' },
+  { label: 'Platform Revenue', value: '--', icon: <TrendingUp />, color: 'info' as const, trend: '--' },
+  { label: 'Active Projects', value: '--', icon: <Assessment />, color: 'warning' as const, trend: '--' }
 ];
 
 export const MainDashboard: React.FC = () => {
   const { user } = useAuth();
+  const theme = useTheme();
 
   return (
-    <Box sx={{ bgcolor: 'grey.50', minHeight: '100vh', py: 3 }}>
-      <Container maxWidth="xl">
-        {/* Automore Header */}
+    <AppLayout>
+      <Box sx={{ width: '100%' }}>
+        {/* Platform Header */}
         <Paper sx={{ 
           p: 3, 
           mb: 3, 
-          background: 'linear-gradient(135deg, #1a237e 0%, #283593 100%)', 
-          color: 'white' 
+          background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)', 
+          color: 'white',
+          borderRadius: 2,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ bgcolor: 'white', color: 'primary.main', width: 56, height: 56 }}>
-              <Dashboard fontSize="large" />
+            <Avatar sx={{ bgcolor: 'white', color: 'primary.main', width: 64, height: 64 }}>
+              <Business fontSize="large" />
             </Avatar>
             <Box>
-              <Typography variant="h3" fontWeight="bold">
+              <Typography variant="h3" fontWeight="bold" gutterBottom>
                 Automore Platform
               </Typography>
               <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                Welcome back, {user?.firstName}! • SaaS Platform Administration
+                Welcome back, {user?.firstName}! System Administrator Dashboard
               </Typography>
-            </Box>
-            <Box sx={{ ml: 'auto', textAlign: 'right' }}>
               <Chip 
-                label="PLATFORM ADMIN" 
-                sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 'bold', mb: 1 }}
+                label="SYSTEM ADMIN" 
+                sx={{ 
+                  mt: 1,
+                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  color: 'white', 
+                  fontWeight: 'bold' 
+                }}
               />
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                {new Date().toLocaleDateString('en-ZA', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </Typography>
             </Box>
           </Box>
         </Paper>
 
-        {/* Platform KPIs - Using CSS Grid */}
+        {/* Platform Statistics */}
         <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' },
-          gap: 3,
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 3, 
           mb: 3 
         }}>
           {platformStats.map((stat, index) => (
-            <Card key={index}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Avatar sx={{ bgcolor: `${stat.color}.main`, color: 'white' }}>
-                    {stat.icon}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h4" fontWeight="bold">
-                      {stat.value}
-                    </Typography>
-                    <Typography color="text.secondary">
-                      {stat.label}
-                    </Typography>
+            <Box key={index} sx={{ 
+              flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' },
+              minWidth: 0
+            }}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ bgcolor: `${stat.color}.main`, color: 'white' }}>
+                      {stat.icon}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="h4" fontWeight="bold" color={`${stat.color}.main`}>
+                        {stat.value}
+                      </Typography>
+                      <Typography color="text.secondary" variant="body2">
+                        {stat.label}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {stat.trend}
+                      </Typography>
+                    </Box>
                   </Box>
-                </Box>
-                <Chip 
-                  label={stat.growth} 
-                  color="success" 
-                  size="small" 
-                  sx={{ fontWeight: 'bold' }}
-                />
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Box>
           ))}
         </Box>
 
-        {/* Main Content - Using CSS Grid */}
+        {/* Main Content Layout */}
         <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
-          gap: 3 
+          display: 'flex', 
+          flexDirection: { xs: 'column', md: 'row' }, 
+          gap: 3, 
+          mb: 3 
         }}>
-          {/* Top Partners Performance */}
-          <Box>
-            <Card>
+          {/* Platform Overview */}
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 66.666%' },
+            minWidth: 0
+          }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Top Partner Companies
+                  Platform Overview
                 </Typography>
-                <Typography color="text.secondary" sx={{ mb: 2 }}>
-                  Revenue performance of your B2B partners this month
+                <Typography color="text.secondary" sx={{ mb: 3 }}>
+                  Real-time platform metrics and partner performance will be displayed here
                 </Typography>
                 
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell><strong>Partner Company</strong></TableCell>
-                        <TableCell align="center"><strong>Clients</strong></TableCell>
-                        <TableCell align="center"><strong>Monthly Revenue</strong></TableCell>
-                        <TableCell align="center"><strong>Growth</strong></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {topPartners.map((partner, index) => (
-                        <TableRow key={index} hover>
-                          <TableCell>
-                            <Typography variant="body1" fontWeight="bold">
-                              {partner.name}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip label={partner.clients} color="primary" size="small" />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body1" fontWeight="bold" color="success.main">
-                              {partner.revenue}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip 
-                              label={partner.growth} 
-                              color="success" 
-                              size="small" 
-                              variant="outlined"
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
-
-            {/* System Activity */}
-            <Card sx={{ mt: 2 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Platform Activity
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {systemActivity.map((activity, index) => (
-                    <Paper key={index} sx={{ p: 2, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
-                      <Typography variant="body2">
-                        {activity}
-                      </Typography>
-                    </Paper>
-                  ))}
+                {/* Placeholder for charts/data */}
+                <Box sx={{ 
+                  height: 300, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  bgcolor: 'grey.50',
+                  borderRadius: 1,
+                  border: `1px dashed ${theme.palette.divider}`
+                }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Platform analytics chart will be integrated here
+                  </Typography>
                 </Box>
               </CardContent>
             </Card>
           </Box>
 
-          {/* Platform Administration */}
-          <Box>
-            <Card>
+          {/* Platform Management Actions */}
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 33.333%' },
+            minWidth: 0
+          }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Platform Management
                 </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Button
                     variant="contained"
                     startIcon={<Add />}
                     fullWidth
                     size="large"
+                    color="primary"
                   >
                     Onboard New Partner
                   </Button>
@@ -241,55 +183,50 @@ export const MainDashboard: React.FC = () => {
                     startIcon={<Analytics />}
                     fullWidth
                   >
-                    Revenue Analytics
+                    Platform Analytics
                   </Button>
                   <Button
                     variant="outlined"
-                    startIcon={<Settings />}
+                    startIcon={<Assessment />}
                     fullWidth
                   >
-                    Platform Settings
+                    System Reports
                   </Button>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Revenue Breakdown */}
-            <Card sx={{ mt: 2 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Revenue Sources
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="body2">Partner Subscriptions</Typography>
-                      <Typography variant="body2" fontWeight="bold">R324,800</Typography>
-                    </Box>
-                    <Box sx={{ bgcolor: 'grey.200', height: 8, borderRadius: 4 }}>
-                      <Box sx={{ bgcolor: 'primary.main', height: 8, width: '67%', borderRadius: 4 }} />
-                    </Box>
-                  </Box>
-                  
-                  <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="body2">Direct Clients</Typography>
-                      <Typography variant="body2" fontWeight="bold">R160,400</Typography>
-                    </Box>
-                    <Box sx={{ bgcolor: 'grey.200', height: 8, borderRadius: 4 }}>
-                      <Box sx={{ bgcolor: 'success.main', height: 8, width: '33%', borderRadius: 4 }} />
-                    </Box>
-                  </Box>
-
-                  <Typography variant="h6" fontWeight="bold" color="primary" sx={{ mt: 1 }}>
-                    Total: R485,200/month
-                  </Typography>
                 </Box>
               </CardContent>
             </Card>
           </Box>
         </Box>
-      </Container>
-    </Box>
+
+        {/* Recent Platform Activity */}
+        <Box sx={{ width: '100%' }}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Recent Platform Activity
+              </Typography>
+              <Typography color="text.secondary" sx={{ mb: 2 }}>
+                Latest system events and partner activities
+              </Typography>
+              
+              {/* Placeholder for activity feed */}
+              <Box sx={{ 
+                height: 200, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                bgcolor: 'grey.50',
+                borderRadius: 1,
+                border: `1px dashed ${theme.palette.divider}`
+              }}>
+                <Typography variant="body1" color="text.secondary">
+                  Real-time activity feed will be integrated here
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
+    </AppLayout>
   );
 };

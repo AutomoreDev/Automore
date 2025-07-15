@@ -1,7 +1,7 @@
+// frontend/src/components/dashboard/ClientDashboard/ClientDashboard.tsx
 import React from 'react';
 import {
   Box,
-  Container,
   Typography,
   Card,
   CardContent,
@@ -9,11 +9,7 @@ import {
   Paper,
   Avatar,
   Chip,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon
+  useTheme,
 } from '@mui/material';
 import {
   Person,
@@ -22,106 +18,74 @@ import {
   Payment,
   Add,
   CheckCircle,
-  Schedule,
-  Warning
+  ContactSupport,
+  Receipt,
 } from '@mui/icons-material';
 import { useAuth } from '../../../context/auth/AuthContext';
+import { AppLayout } from '../../common/Layout/AppLayout';
 
+// Remove dummy data - these will be loaded from API
 const clientStats = [
-  { label: 'Active Projects', value: '3', icon: <Assignment />, color: 'primary' },
-  { label: 'Open Support Tickets', value: '1', icon: <Support />, color: 'warning' },
-  { label: 'Pending Invoices', value: '2', icon: <Payment />, color: 'error' },
-  { label: 'Completed Milestones', value: '12', icon: <CheckCircle />, color: 'success' }
-];
-
-const clientProjects = [
-  { 
-    name: 'Website Development', 
-    progress: 75, 
-    status: 'In Progress', 
-    dueDate: '2025-02-15',
-    provider: 'Digital Solutions SA'
-  },
-  { 
-    name: 'Mobile App Design', 
-    progress: 40, 
-    status: 'In Progress', 
-    dueDate: '2025-03-01',
-    provider: 'Digital Solutions SA'
-  },
-  { 
-    name: 'Brand Guidelines', 
-    progress: 100, 
-    status: 'Completed', 
-    dueDate: '2024-12-20',
-    provider: 'Automore Direct'
-  }
-];
-
-const recentUpdates = [
-  { 
-    type: 'project', 
-    message: 'Website Development: New mockups uploaded by Digital Solutions SA', 
-    time: '2 hours ago' 
-  },
-  { 
-    type: 'ticket', 
-    message: 'Support Ticket #T-456: Response received from your provider', 
-    time: '1 day ago' 
-  },
-  { 
-    type: 'invoice', 
-    message: 'Invoice #INV-002: Payment reminder - Due in 3 days', 
-    time: '2 days ago' 
-  },
-  { 
-    type: 'project', 
-    message: 'Mobile App Design: Milestone completed ahead of schedule', 
-    time: '3 days ago' 
-  }
+  { label: 'Active Projects', value: '--', icon: <Assignment />, color: 'primary' as const },
+  { label: 'Open Support Tickets', value: '--', icon: <Support />, color: 'warning' as const },
+  { label: 'Pending Invoices', value: '--', icon: <Payment />, color: 'error' as const },
+  { label: 'Completed Milestones', value: '--', icon: <CheckCircle />, color: 'success' as const }
 ];
 
 export const ClientDashboard: React.FC = () => {
   const { user } = useAuth();
+  const theme = useTheme();
 
-  const getUpdateIcon = (type: string) => {
-    switch (type) {
-      case 'project': return <Assignment color="primary" />;
-      case 'ticket': return <Support color="warning" />;
-      case 'invoice': return <Payment color="error" />;
-      default: return <Schedule color="action" />;
+  // Get service provider - determine based on user's company context
+  const getServiceProvider = () => {
+    // For client users, they might be serviced by a business/partner or directly by Automore
+    if (user?.companyName) {
+      // If they have a company name but are CLIENT role, they're likely serviced by that company
+      if (user.role === 'CLIENT_ADMIN' || user.role === 'CLIENT_USER') {
+        return user.companyName;
+      }
+      return user.companyName;
     }
+    // Default fallback
+    return 'Automore';
   };
 
-  // Determine service provider (could be Automore direct or a partner)
-  const serviceProvider = user?.companyName || 'Automore';
+  const serviceProvider = getServiceProvider();
 
   return (
-    <Box sx={{ bgcolor: 'grey.50', minHeight: '100vh', py: 3 }}>
-      <Container maxWidth="lg">
+    <AppLayout>
+      <Box sx={{ width: '100%' }}>
         {/* Client Header */}
         <Paper sx={{ 
           p: 3, 
           mb: 3, 
-          background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)', 
-          color: 'white' 
+          background: 'linear-gradient(135deg, #7b1fa2 0%, #8e24aa 100%)', 
+          color: 'white',
+          borderRadius: 2,
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ bgcolor: 'white', color: 'primary.main', width: 56, height: 56 }}>
-              <Person fontSize="large" />
-            </Avatar>
-            <Box>
-              <Typography variant="h3" fontWeight="bold">
-                Client Portal
-              </Typography>
-              <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                Welcome, {user?.firstName}! • Track your projects and support
-              </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'white', color: 'primary.main', width: 64, height: 64 }}>
+                <Person fontSize="large" />
+              </Avatar>
+              <Box>
+                <Typography variant="h3" fontWeight="bold" gutterBottom>
+                  Welcome, {user?.firstName}!
+                </Typography>
+                <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                  Track your projects and support
+                </Typography>
+              </Box>
             </Box>
-            <Box sx={{ ml: 'auto', textAlign: 'right' }}>
+            <Box sx={{ textAlign: 'right' }}>
               <Chip 
                 label="CLIENT" 
-                sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 'bold', mb: 1 }}
+                sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  color: 'white', 
+                  fontWeight: 'bold', 
+                  mb: 1 
+                }}
               />
               <Typography variant="body2" sx={{ opacity: 0.8 }}>
                 Serviced by {serviceProvider}
@@ -130,43 +94,52 @@ export const ClientDashboard: React.FC = () => {
           </Box>
         </Paper>
 
-        {/* Client Stats - Using CSS Grid */}
+        {/* Client Statistics */}
         <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' },
-          gap: 3,
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 3, 
           mb: 3 
         }}>
           {clientStats.map((stat, index) => (
-            <Card key={index}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: `${stat.color}.main`, color: 'white' }}>
-                    {stat.icon}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold">
-                      {stat.value}
-                    </Typography>
-                    <Typography color="text.secondary">
-                      {stat.label}
-                    </Typography>
+            <Box key={index} sx={{ 
+              flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' },
+              minWidth: 0
+            }}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ bgcolor: `${stat.color}.main`, color: 'white' }}>
+                      {stat.icon}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="h4" fontWeight="bold" color={`${stat.color}.main`}>
+                        {stat.value}
+                      </Typography>
+                      <Typography color="text.secondary" variant="body2">
+                        {stat.label}
+                      </Typography>
+                    </Box>
                   </Box>
-                </Box>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Box>
           ))}
         </Box>
 
-        {/* Main Content - Using CSS Grid */}
+        {/* Main Content Layout */}
         <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
-          gap: 3 
+          display: 'flex', 
+          flexDirection: { xs: 'column', md: 'row' }, 
+          gap: 3, 
+          mb: 3 
         }}>
-          {/* Projects & Updates */}
-          <Box>
-            <Card>
+          {/* Projects Overview */}
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 66.666%' },
+            minWidth: 0
+          }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Your Projects
@@ -175,76 +148,41 @@ export const ClientDashboard: React.FC = () => {
                   Track the progress of your ongoing projects
                 </Typography>
                 
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {clientProjects.map((project, index) => (
-                    <Box key={index}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                        <Box>
-                          <Typography variant="body1" fontWeight="bold">
-                            {project.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Due: {new Date(project.dueDate).toLocaleDateString('en-ZA')} • 
-                            Provider: {project.provider}
-                          </Typography>
-                        </Box>
-                        <Chip 
-                          label={project.status} 
-                          color={project.status === 'Completed' ? 'success' : 'primary'}
-                          size="small"
-                          icon={project.status === 'Completed' ? <CheckCircle /> : <Schedule />}
-                        />
-                      </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={project.progress} 
-                        sx={{ height: 8, borderRadius: 4 }}
-                      />
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {project.progress}% Complete
-                      </Typography>
-                    </Box>
-                  ))}
+                {/* Placeholder for projects list */}
+                <Box sx={{ 
+                  height: 300, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  bgcolor: 'grey.50',
+                  borderRadius: 1,
+                  border: `1px dashed ${theme.palette.divider}`
+                }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Project tracking interface will be integrated here
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-
-            {/* Recent Updates */}
-            <Card sx={{ mt: 2 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Recent Updates
-                </Typography>
-                <List>
-                  {recentUpdates.map((update, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        {getUpdateIcon(update.type)}
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={update.message}
-                        secondary={update.time}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
               </CardContent>
             </Card>
           </Box>
 
           {/* Client Actions */}
-          <Box>
-            <Card>
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 33.333%' },
+            minWidth: 0
+          }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Quick Actions
                 </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Button
                     variant="contained"
                     startIcon={<Add />}
                     fullWidth
                     size="large"
+                    color="primary"
                   >
                     New Support Request
                   </Button>
@@ -257,63 +195,95 @@ export const ClientDashboard: React.FC = () => {
                   </Button>
                   <Button
                     variant="outlined"
-                    startIcon={<Payment />}
+                    startIcon={<Receipt />}
                     fullWidth
                   >
-                    Pay Outstanding Invoices
+                    View Invoices
                   </Button>
                   <Button
                     variant="outlined"
-                    startIcon={<Support />}
+                    startIcon={<ContactSupport />}
                     fullWidth
                   >
-                    Support History
+                    Contact Support
                   </Button>
                 </Box>
-              </CardContent>
-            </Card>
-
-            {/* Outstanding Invoices Alert */}
-            <Card sx={{ mt: 2 }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Warning color="error" />
-                  <Typography variant="h6" fontWeight="bold">
-                    Payment Required
-                  </Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  You have outstanding invoices requiring payment
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {[
-                    { id: 'INV-002', amount: 'R12,500', due: '2025-01-15', provider: 'Digital Solutions SA' },
-                    { id: 'INV-003', amount: 'R8,200', due: '2025-01-22', provider: 'Automore Direct' }
-                  ].map((invoice, index) => (
-                    <Paper key={index} sx={{ p: 2, bgcolor: 'error.50', border: 1, borderColor: 'error.200' }}>
-                      <Typography variant="body2" fontWeight="bold">
-                        {invoice.id} - {invoice.amount}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Due: {invoice.due} • {invoice.provider}
-                      </Typography>
-                    </Paper>
-                  ))}
-                </Box>
-                <Button 
-                  variant="contained" 
-                  color="error" 
-                  fullWidth 
-                  sx={{ mt: 2 }}
-                  startIcon={<Payment />}
-                >
-                  Pay Now - R20,700
-                </Button>
               </CardContent>
             </Card>
           </Box>
         </Box>
-      </Container>
-    </Box>
+
+        {/* Updates and Invoice Status */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', md: 'row' }, 
+          gap: 3 
+        }}>
+          {/* Recent Updates */}
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 50%' },
+            minWidth: 0
+          }}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                  Recent Updates
+                </Typography>
+                <Typography color="text.secondary" sx={{ mb: 2 }}>
+                  Latest updates from your projects and support requests
+                </Typography>
+                
+                {/* Placeholder for updates list */}
+                <Box sx={{ 
+                  height: 200, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  bgcolor: 'grey.50',
+                  borderRadius: 1,
+                  border: `1px dashed ${theme.palette.divider}`
+                }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Recent updates feed will be integrated here
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Invoice Status */}
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 50%' },
+            minWidth: 0
+          }}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                  Invoice Status
+                </Typography>
+                <Typography color="text.secondary" sx={{ mb: 2 }}>
+                  Outstanding invoices and payment history
+                </Typography>
+                
+                {/* Placeholder for invoice status */}
+                <Box sx={{ 
+                  height: 200, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  bgcolor: 'grey.50',
+                  borderRadius: 1,
+                  border: `1px dashed ${theme.palette.divider}`
+                }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Invoice status dashboard will be integrated here
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      </Box>
+    </AppLayout>
   );
 };
