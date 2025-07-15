@@ -247,13 +247,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({ ticketId, onMe
       </form>
 
       {/* Hidden File Input */}
-      <input
+      <Box
+        component="input"
         type="file"
         ref={fileInputRef}
         onChange={handleFileInputChange}
         multiple
         accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
-        style={{ display: 'none' }}
+        sx={{ display: 'none' }}
         aria-label="Select files to attach"
         title="Select files to attach"
       />
