@@ -1,5 +1,5 @@
 // frontend/src/components/tickets/CreateTicket/CreateTicket.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -15,7 +15,6 @@ import {
   IconButton,
   Alert,
   LinearProgress,
-  useTheme,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -30,7 +29,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AppLayout } from '../../common/Layout/AppLayout';
-import { useCreateTicket } from '../../../hooks/ticket/useTickets';
+import { useCreateTicket } from '../../../hooks/tickets/useTickets';
 import {
   CreateTicketForm,
   TicketPriority,
@@ -69,22 +68,20 @@ const ticketSchema = yup.object({
 type FormData = yup.InferType<typeof ticketSchema>;
 
 export const CreateTicket: React.FC = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { createTicket, loading, error } = useCreateTicket();
-
+  
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [newTag, setNewTag] = useState('');
 
   const {
     control,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
     watch,
     setValue,
-    getValues,
   } = useForm<FormData>({
-    resolver: yupResolver(ticketSchema),
+    resolver: yupResolver(ticketSchema) as any,
     defaultValues: {
       title: '',
       description: '',
@@ -92,13 +89,73 @@ export const CreateTicket: React.FC = () => {
       category: TicketCategory.GENERAL,
       tags: [],
       estimatedHours: null,
-      dueDate: null,
+      dueDate: '',
     },
   });
 
-  const tags = watch('tags') || [];
+  const watchedTags = watch('tags');
+  
+  // Memoize tags to prevent dependency issues
+  const tags = useMemo(() => {
+    return (watchedTags || []).filter((tag): tag is string => Boolean(tag));
+  }, [watchedTags]);
 
-  // Handle form submission
+  const handleBack = useCallback(() => {
+    navigate('/tickets');
+  }, [navigate]);
+
+  const handleFileSelect = useCallback((files: FileList | null) => {
+    if (!files) return;
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxFiles = 5;
+    
+    const validFiles = Array.from(files).filter(file => {
+      if (file.size > maxSize) {
+        alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
+        return false;
+      }
+      return true;
+    });
+
+    const totalFiles = attachments.length + validFiles.length;
+    if (totalFiles > maxFiles) {
+      alert(`Maximum ${maxFiles} files allowed.`);
+      return;
+    }
+
+    setAttachments(prev => [...prev, ...validFiles]);
+  }, [attachments.length]);
+
+  const handleRemoveAttachment = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleAddTag = useCallback(() => {
+    if (!newTag.trim() || tags.includes(newTag.trim())) return;
+    
+    if (tags.length >= 10) {
+      alert('Maximum 10 tags allowed');
+      return;
+    }
+
+    const updatedTags = [...tags, newTag.trim()];
+    setValue('tags', updatedTags);
+    setNewTag('');
+  }, [newTag, tags, setValue]);
+
+  const handleRemoveTag = useCallback((tagToRemove: string) => {
+    const updatedTags = tags.filter(tag => tag !== tagToRemove);
+    setValue('tags', updatedTags);
+  }, [tags, setValue]);
+
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
+    }
+  }, [handleAddTag]);
+
   const onSubmit = useCallback(async (data: FormData) => {
     try {
       const ticketData: CreateTicketForm = {
@@ -106,7 +163,7 @@ export const CreateTicket: React.FC = () => {
         description: data.description,
         priority: data.priority as TicketPriority,
         category: data.category as TicketCategory,
-        tags: data.tags || [],
+        tags: tags,
         estimatedHours: data.estimatedHours || undefined,
         dueDate: data.dueDate || undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
@@ -114,53 +171,11 @@ export const CreateTicket: React.FC = () => {
 
       const newTicket = await createTicket(ticketData);
       navigate(`/tickets/${newTicket.id}`);
-    } catch (err) {
-      // Error handling is done in the hook
+    } catch (error) {
+      console.error('Failed to create ticket:', error);
     }
-  }, [createTicket, attachments, navigate]);
+  }, [createTicket, navigate, tags, attachments]);
 
-  // Handle file attachments
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    
-    // Validate file size (max 10MB per file)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    const validFiles = files.filter(file => {
-      if (file.size > maxSize) {
-        alert(`File ${file.name} is too large. Maximum size is 10MB.`);
-        return false;
-      }
-      return true;
-    });
-
-    setAttachments(prev => [...prev, ...validFiles]);
-  }, []);
-
-  const removeAttachment = useCallback((index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  // Handle tags
-  const addTag = useCallback(() => {
-    const tag = tagInput.trim();
-    if (tag && !tags.includes(tag) && tags.length < 10) {
-      setValue('tags', [...tags, tag]);
-      setTagInput('');
-    }
-  }, [tagInput, tags, setValue]);
-
-  const removeTag = useCallback((tagToRemove: string) => {
-    setValue('tags', tags.filter(tag => tag !== tagToRemove));
-  }, [tags, setValue]);
-
-  const handleTagKeyPress = useCallback((event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      addTag();
-    }
-  }, [addTag]);
-
-  // Format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -171,29 +186,30 @@ export const CreateTicket: React.FC = () => {
 
   return (
     <AppLayout>
-      <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <IconButton onClick={() => navigate(-1)}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <IconButton onClick={handleBack} sx={{ mr: 2 }}>
             <BackIcon />
           </IconButton>
           <Typography variant="h4" fontWeight="bold">
-            Create Support Ticket
+            Create New Ticket
           </Typography>
         </Box>
 
-        {/* Form */}
-        <Card>
-          <CardContent sx={{ p: 4 }}>
-            {loading && <LinearProgress sx={{ mb: 2 }} />}
-            
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            )}
+        {/* Loading indicator */}
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-            <form onSubmit={handleSubmit(onSubmit)}>
+        {/* Error display */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Card>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit as any)}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {/* Title */}
                 <Controller
@@ -207,7 +223,6 @@ export const CreateTicket: React.FC = () => {
                       required
                       error={!!errors.title}
                       helperText={errors.title?.message}
-                      placeholder="Brief description of your issue"
                     />
                   )}
                 />
@@ -220,30 +235,30 @@ export const CreateTicket: React.FC = () => {
                     <TextField
                       {...field}
                       label="Description"
+                      multiline
+                      rows={4}
                       fullWidth
                       required
-                      multiline
-                      rows={6}
                       error={!!errors.description}
                       helperText={errors.description?.message}
-                      placeholder="Provide detailed information about your issue..."
                     />
                   )}
                 />
 
                 {/* Priority and Category */}
-                <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
                   <Controller
                     name="priority"
                     control={control}
                     render={({ field }) => (
-                      <FormControl fullWidth required error={!!errors.priority}>
+                      <FormControl fullWidth required>
                         <InputLabel>Priority</InputLabel>
                         <Select {...field} label="Priority">
-                          <MenuItem value={TicketPriority.LOW}>Low</MenuItem>
-                          <MenuItem value={TicketPriority.MEDIUM}>Medium</MenuItem>
-                          <MenuItem value={TicketPriority.HIGH}>High</MenuItem>
-                          <MenuItem value={TicketPriority.CRITICAL}>Critical</MenuItem>
+                          {Object.values(TicketPriority).map((priority) => (
+                            <MenuItem key={priority} value={priority}>
+                              {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                            </MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     )}
@@ -253,36 +268,73 @@ export const CreateTicket: React.FC = () => {
                     name="category"
                     control={control}
                     render={({ field }) => (
-                      <FormControl fullWidth required error={!!errors.category}>
+                      <FormControl fullWidth required>
                         <InputLabel>Category</InputLabel>
                         <Select {...field} label="Category">
-                          <MenuItem value={TicketCategory.GENERAL}>General</MenuItem>
-                          <MenuItem value={TicketCategory.TECHNICAL}>Technical</MenuItem>
-                          <MenuItem value={TicketCategory.BILLING}>Billing</MenuItem>
-                          <MenuItem value={TicketCategory.BUG}>Bug Report</MenuItem>
-                          <MenuItem value={TicketCategory.FEATURE_REQUEST}>Feature Request</MenuItem>
+                          {Object.values(TicketCategory).map((category) => (
+                            <MenuItem key={category} value={category}>
+                              {category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     )}
                   />
                 </Box>
 
+                {/* Tags */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Tags
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                    {tags.map((tag, index) => (
+                      <Chip
+                        key={index}
+                        label={tag}
+                        onDelete={() => handleRemoveTag(tag)}
+                        deleteIcon={<CloseIcon />}
+                        variant="outlined"
+                        size="small"
+                      />
+                    ))}
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Add tag"
+                      size="small"
+                      sx={{ flex: 1 }}
+                    />
+                    <Button
+                      onClick={handleAddTag}
+                      variant="outlined"
+                      startIcon={<AddIcon />}
+                      disabled={!newTag.trim() || tags.length >= 10}
+                    >
+                      Add
+                    </Button>
+                  </Box>
+                </Box>
+
                 {/* Estimated Hours and Due Date */}
-                <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
                   <Controller
                     name="estimatedHours"
                     control={control}
                     render={({ field: { value, onChange, ...field } }) => (
                       <TextField
                         {...field}
-                        label="Estimated Hours (Optional)"
-                        type="number"
-                        fullWidth
                         value={value || ''}
                         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+                        label="Estimated Hours"
+                        type="number"
+                        fullWidth
+                        inputProps={{ min: 0.5, step: 0.5 }}
                         error={!!errors.estimatedHours}
                         helperText={errors.estimatedHours?.message}
-                        inputProps={{ min: 0.5, max: 1000, step: 0.5 }}
                       />
                     )}
                   />
@@ -293,79 +345,25 @@ export const CreateTicket: React.FC = () => {
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label="Due Date (Optional)"
+                        label="Due Date"
                         type="date"
                         fullWidth
                         InputLabelProps={{ shrink: true }}
-                        value={field.value || ''}
+                        error={!!errors.dueDate}
+                        helperText={errors.dueDate?.message}
                       />
                     )}
                   />
                 </Box>
 
-                {/* Tags */}
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Tags (Optional)
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
-                    <TextField
-                      size="small"
-                      placeholder="Add tag..."
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyPress={handleTagKeyPress}
-                      disabled={tags.length >= 10}
-                    />
-                    <Button
-                      size="small"
-                      onClick={addTag}
-                      disabled={!tagInput.trim() || tags.includes(tagInput.trim()) || tags.length >= 10}
-                    >
-                      Add
-                    </Button>
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {tags.map((tag) => (
-                      <Chip
-                        key={tag}
-                        label={tag}
-                        size="small"
-                        onDelete={() => removeTag(tag)}
-                        deleteIcon={<CloseIcon />}
-                      />
-                    ))}
-                  </Box>
-                  {tags.length >= 10 && (
-                    <Typography variant="caption" color="warning.main">
-                      Maximum 10 tags allowed
-                    </Typography>
-                  )}
-                </Box>
-
                 {/* File Attachments */}
                 <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Attachments (Optional)
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Attachments ({attachments.length}/5)
                   </Typography>
-                  <Button
-                    component="label"
-                    variant="outlined"
-                    startIcon={<UploadIcon />}
-                    sx={{ mb: 2 }}
-                  >
-                    Upload Files
-                    <input
-                      type="file"
-                      hidden
-                      multiple
-                      onChange={handleFileUpload}
-                      accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip"
-                    />
-                  </Button>
                   
                   {attachments.length > 0 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Box sx={{ mb: 2 }}>
                       {attachments.map((file, index) => (
                         <Box
                           key={index}
@@ -377,9 +375,10 @@ export const CreateTicket: React.FC = () => {
                             border: 1,
                             borderColor: 'divider',
                             borderRadius: 1,
+                            mb: 1,
                           }}
                         >
-                          <FileIcon color="primary" />
+                          <FileIcon />
                           <Box sx={{ flex: 1 }}>
                             <Typography variant="body2">{file.name}</Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -388,8 +387,7 @@ export const CreateTicket: React.FC = () => {
                           </Box>
                           <IconButton
                             size="small"
-                            onClick={() => removeAttachment(index)}
-                            color="error"
+                            onClick={() => handleRemoveAttachment(index)}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -397,28 +395,39 @@ export const CreateTicket: React.FC = () => {
                       ))}
                     </Box>
                   )}
-                  
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                    Supported formats: JPG, PNG, GIF, PDF, DOC, DOCX, TXT, ZIP (Max 10MB per file)
-                  </Typography>
+
+                  <Button
+                    variant="outlined"
+                    startIcon={<UploadIcon />}
+                    component="label"
+                    disabled={attachments.length >= 5}
+                  >
+                    Upload Files
+                    <input
+                      type="file"
+                      hidden
+                      multiple
+                      onChange={(e) => handleFileSelect(e.target.files)}
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+                    />
+                  </Button>
                 </Box>
 
                 {/* Submit Buttons */}
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                   <Button
                     variant="outlined"
-                    onClick={() => navigate(-1)}
-                    disabled={loading}
+                    onClick={handleBack}
+                    disabled={isSubmitting}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     variant="contained"
-                    disabled={loading}
-                    startIcon={loading ? undefined : <AddIcon />}
+                    disabled={isSubmitting}
                   >
-                    {loading ? 'Creating...' : 'Create Ticket'}
+                    {isSubmitting ? 'Creating...' : 'Create Ticket'}
                   </Button>
                 </Box>
               </Box>

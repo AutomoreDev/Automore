@@ -9,7 +9,6 @@ import {
   PaginatedTickets,
   TicketStatistics,
   TicketMessage,
-  TicketAttachment
 } from '../../types/ticket';
 import { ApiResponse } from '../../shared/types/api';
 
@@ -38,7 +37,12 @@ export class TicketApiService {
     const response = await apiClient.get<ApiResponse<PaginatedTickets>>(
       `/tickets?${searchParams.toString()}`
     );
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('No data received from server');
+    }
+    
+    return response.data.data;
   }
 
   /**
@@ -62,7 +66,12 @@ export class TicketApiService {
     const response = await apiClient.get<ApiResponse<PaginatedTickets>>(
       `/tickets/my-tickets?${searchParams.toString()}`
     );
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('No data received from server');
+    }
+    
+    return response.data.data;
   }
 
   /**
@@ -86,7 +95,12 @@ export class TicketApiService {
     const response = await apiClient.get<ApiResponse<PaginatedTickets>>(
       `/tickets/my-created-tickets?${searchParams.toString()}`
     );
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('No data received from server');
+    }
+    
+    return response.data.data;
   }
 
   /**
@@ -94,51 +108,53 @@ export class TicketApiService {
    */
   async getTicketById(id: string): Promise<Ticket> {
     const response = await apiClient.get<ApiResponse<Ticket>>(`/tickets/${id}`);
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('Ticket not found');
+    }
+    
+    return response.data.data;
   }
 
   /**
    * Create a new ticket
    */
   async createTicket(ticketData: CreateTicketForm): Promise<Ticket> {
-    // Convert form data to FormData if attachments are present
-    if (ticketData.attachments && ticketData.attachments.length > 0) {
-      const formData = new FormData();
-      
-      // Add text fields
-      formData.append('title', ticketData.title);
-      formData.append('description', ticketData.description);
-      formData.append('priority', ticketData.priority);
-      formData.append('category', ticketData.category);
-      
-      if (ticketData.tags && ticketData.tags.length > 0) {
-        formData.append('tags', JSON.stringify(ticketData.tags));
-      }
-      
-      if (ticketData.estimatedHours) {
-        formData.append('estimatedHours', ticketData.estimatedHours.toString());
-      }
-      
-      if (ticketData.dueDate) {
-        formData.append('dueDate', ticketData.dueDate);
-      }
-      
-      // Add attachments
+    const formData = new FormData();
+    
+    // Add ticket data
+    formData.append('title', ticketData.title);
+    formData.append('description', ticketData.description);
+    formData.append('priority', ticketData.priority);
+    formData.append('category', ticketData.category);
+    formData.append('tags', JSON.stringify(ticketData.tags));
+    
+    if (ticketData.estimatedHours) {
+      formData.append('estimatedHours', ticketData.estimatedHours.toString());
+    }
+    
+    if (ticketData.dueDate) {
+      formData.append('dueDate', ticketData.dueDate);
+    }
+    
+    // Add attachments
+    if (ticketData.attachments) {
       ticketData.attachments.forEach((file, index) => {
         formData.append(`attachments`, file);
       });
-      
-      const response = await apiClient.post<ApiResponse<Ticket>>('/tickets', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data.data!;
-    } else {
-      // Send as JSON if no attachments
-      const response = await apiClient.post<ApiResponse<Ticket>>('/tickets', ticketData);
-      return response.data.data!;
     }
+    
+    const response = await apiClient.post<ApiResponse<Ticket>>('/tickets', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to create ticket');
+    }
+    
+    return response.data.data;
   }
 
   /**
@@ -146,7 +162,12 @@ export class TicketApiService {
    */
   async updateTicket(id: string, updates: UpdateTicketForm): Promise<Ticket> {
     const response = await apiClient.put<ApiResponse<Ticket>>(`/tickets/${id}`, updates);
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to update ticket');
+    }
+    
+    return response.data.data;
   }
 
   /**
@@ -163,62 +184,61 @@ export class TicketApiService {
    */
   async getTicketMessages(ticketId: string): Promise<TicketMessage[]> {
     const response = await apiClient.get<ApiResponse<TicketMessage[]>>(`/tickets/${ticketId}/messages`);
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to load messages');
+    }
+    
+    return response.data.data;
   }
 
   /**
-   * Add a message to a ticket
+   * Send a message to a ticket
    */
   async createTicketMessage(ticketId: string, messageData: CreateMessageForm): Promise<TicketMessage> {
-    if (messageData.attachments && messageData.attachments.length > 0) {
-      const formData = new FormData();
-      formData.append('message', messageData.message);
-      
+    const formData = new FormData();
+    formData.append('message', messageData.message);
+    
+    // Add attachments
+    if (messageData.attachments) {
       messageData.attachments.forEach((file) => {
         formData.append('attachments', file);
       });
-      
-      const response = await apiClient.post<ApiResponse<TicketMessage>>(
-        `/tickets/${ticketId}/messages`, 
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-      return response.data.data!;
-    } else {
-      const response = await apiClient.post<ApiResponse<TicketMessage>>(
-        `/tickets/${ticketId}/messages`, 
-        messageData
-      );
-      return response.data.data!;
     }
+    
+    const response = await apiClient.post<ApiResponse<TicketMessage>>(
+      `/tickets/${ticketId}/messages`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to send message');
+    }
+    
+    return response.data.data;
   }
 
   // ==================== TICKET ATTACHMENTS ====================
 
   /**
-   * Get all attachments for a ticket
-   */
-  async getTicketAttachments(ticketId: string): Promise<TicketAttachment[]> {
-    const response = await apiClient.get<ApiResponse<TicketAttachment[]>>(`/tickets/${ticketId}/attachments`);
-    return response.data.data!;
-  }
-
-  /**
-   * Download an attachment
+   * Download a ticket attachment
    */
   async downloadAttachment(ticketId: string, attachmentId: string): Promise<Blob> {
-    const response = await apiClient.get(`/tickets/${ticketId}/attachments/${attachmentId}/download`, {
+    const response = await apiClient.get(`/tickets/${ticketId}/attachments/${attachmentId}`, {
       responseType: 'blob',
     });
-    return response.data;
+    
+    // Type assertion since we know responseType is blob
+    return response.data as Blob;
   }
 
   /**
-   * Delete an attachment
+   * Delete a ticket attachment
    */
   async deleteAttachment(ticketId: string, attachmentId: string): Promise<void> {
     await apiClient.delete(`/tickets/${ticketId}/attachments/${attachmentId}`);
@@ -227,33 +247,42 @@ export class TicketApiService {
   // ==================== TICKET STATISTICS ====================
 
   /**
-   * Get ticket statistics for dashboard
+   * Get ticket statistics
    */
   async getTicketStatistics(): Promise<TicketStatistics> {
     const response = await apiClient.get<ApiResponse<TicketStatistics>>('/tickets/statistics');
-    return response.data.data!;
-  }
-
-  // ==================== TICKET ASSIGNMENT ====================
-
-  /**
-   * Assign ticket to a user
-   */
-  async assignTicket(ticketId: string, userId: string): Promise<Ticket> {
-    const response = await apiClient.post<ApiResponse<Ticket>>(`/tickets/${ticketId}/assign`, {
-      assignedTo: userId
-    });
-    return response.data.data!;
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to load statistics');
+    }
+    
+    return response.data.data;
   }
 
   /**
-   * Unassign ticket
+   * Get ticket statistics for a specific user
    */
-  async unassignTicket(ticketId: string): Promise<Ticket> {
-    const response = await apiClient.post<ApiResponse<Ticket>>(`/tickets/${ticketId}/assign`, {
-      assignedTo: null
-    });
-    return response.data.data!;
+  async getUserTicketStatistics(userId: string): Promise<TicketStatistics> {
+    const response = await apiClient.get<ApiResponse<TicketStatistics>>(`/tickets/statistics/user/${userId}`);
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to load user statistics');
+    }
+    
+    return response.data.data;
+  }
+
+  /**
+   * Get ticket statistics for a company
+   */
+  async getCompanyTicketStatistics(companyId: string): Promise<TicketStatistics> {
+    const response = await apiClient.get<ApiResponse<TicketStatistics>>(`/tickets/statistics/company/${companyId}`);
+    
+    if (!response.data?.data) {
+      throw new Error('Failed to load company statistics');
+    }
+    
+    return response.data.data;
   }
 }
 
