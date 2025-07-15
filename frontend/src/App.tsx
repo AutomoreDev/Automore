@@ -11,9 +11,13 @@ import { theme } from './styles/theme';
 
 // Import your components
 import { AuthProvider } from './context/auth/AuthContext';
+import { ProtectedRoute } from './components/auth/ProtectedRoute/ProtectedRoute';
+import { DashboardRouter } from './components/dashboard/DashboardRouter/DashboardRouter';
 import { LandingPage } from './pages/landing/LandingPage';
 import { SignupForm } from './components/auth/SignupForm/SignupForm';
 import { LoginForm } from './components/auth/LoginForm/LoginForm';
+import { UnauthorizedPage } from './pages/ErrorPages/UnauthorizedPage';
+import { NotFoundPage } from './pages/ErrorPages/NotFoundPage';
 
 function App() {
   return (
@@ -22,11 +26,25 @@ function App() {
       <AuthProvider>
         <Router>
           <div className="App">
-            {/* Header removed - will be handled by individual pages */}
             <Routes>
+              {/* Public Routes */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth/signup" element={<SignupForm />} />
               <Route path="/auth/login" element={<LoginForm />} />
+              
+              {/* Protected Dashboard Routes */}
+              <Route 
+                path="/dashboard/*" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardRouter />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Error Routes */}
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
             
             <ToastContainer
@@ -36,7 +54,7 @@ function App() {
               closeOnClick
               draggable
               pauseOnHover
-              theme="light"
+              theme="dark"
               toastStyle={{
                 borderRadius: '12px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',

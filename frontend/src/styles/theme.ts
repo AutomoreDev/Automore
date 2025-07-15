@@ -1,3 +1,4 @@
+// frontend/src/styles/theme.ts
 import { createTheme, ThemeOptions } from '@mui/material/styles';
 
 // Define your brand colors based on Google Sites design
@@ -42,6 +43,12 @@ const themeOptions: ThemeOptions = {
       primary: brandColors.white,
       secondary: 'rgba(255, 255, 255, 0.7)',
     },
+    divider: 'rgba(255, 255, 255, 0.12)',
+    action: {
+      hover: 'rgba(255, 255, 255, 0.08)',
+      selected: 'rgba(255, 255, 255, 0.12)',
+      disabled: 'rgba(255, 255, 255, 0.26)',
+    },
   },
   typography: {
     fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -60,6 +67,11 @@ const themeOptions: ThemeOptions = {
       fontWeight: 500,
       lineHeight: 1.4,
     },
+    h4: {
+      fontSize: 'clamp(20px, 5vw, 28px)',
+      fontWeight: 600,
+      lineHeight: 1.4,
+    },
     body1: {
       fontSize: '16px',
       lineHeight: 1.6,
@@ -73,14 +85,14 @@ const themeOptions: ThemeOptions = {
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 50,
+          borderRadius: 8,
           textTransform: 'none',
           fontSize: '16px',
           fontWeight: 500,
           padding: '12px 32px',
           transition: 'all 0.3s ease',
           '&:hover': {
-            transform: 'translateY(-2px)',
+            transform: 'translateY(-1px)',
             boxShadow: '0 10px 20px rgba(99, 102, 241, 0.3)',
           },
         },
@@ -99,10 +111,91 @@ const themeOptions: ThemeOptions = {
           backgroundColor: brandColors.surface,
           border: `1px solid ${brandColors.gray[700]}`,
           '&:hover': {
-            transform: 'translateY(-4px)',
+            transform: 'translateY(-2px)',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
           },
           transition: 'all 0.3s ease',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundColor: brandColors.surface,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            '& fieldset': {
+              borderColor: 'rgba(255, 255, 255, 0.23)',
+            },
+            '&:hover fieldset': {
+              borderColor: brandColors.primary,
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: brandColors.primary,
+            },
+          },
+          '& .MuiInputLabel-root': {
+            color: 'rgba(255, 255, 255, 0.7)',
+            '&.Mui-focused': {
+              color: brandColors.primary,
+            },
+          },
+          '& .MuiFormHelperText-root': {
+            color: 'rgba(255, 255, 255, 0.6)',
+            '&.Mui-error': {
+              color: '#f44336',
+            },
+          },
+        },
+      },
+    },
+    MuiCheckbox: {
+      styleOverrides: {
+        root: {
+          color: 'rgba(255, 255, 255, 0.7)',
+          '&.Mui-checked': {
+            color: brandColors.primary,
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          color: 'rgba(255, 255, 255, 0.7)',
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+          },
+        },
+      },
+    },
+    MuiInputAdornment: {
+      styleOverrides: {
+        root: {
+          color: 'rgba(255, 255, 255, 0.7)',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: brandColors.surface,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: brandColors.surface,
+          borderRight: `1px solid rgba(255, 255, 255, 0.12)`,
         },
       },
     },
