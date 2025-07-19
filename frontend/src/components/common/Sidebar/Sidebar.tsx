@@ -60,225 +60,188 @@ export const Sidebar: React.FC<SidebarProps> = ({
   
   // Use controlled state if provided, otherwise use internal state
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const handleToggle = onToggle || (() => setInternalOpen(!internalOpen));
+  
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle();
+    } else {
+      setInternalOpen(!internalOpen);
+    }
+  };
 
-  // Navigation items based on user role
-  const getNavItems = (): NavItem[] => {
-    const baseItems: NavItem[] = [
+  // Navigation items based on user role and SaaS hierarchy
+  const getNavigationItems = (): NavItem[] => {
+    const commonItems: NavItem[] = [
       {
         label: 'Dashboard',
         path: '/dashboard',
         icon: <DashboardIcon />,
       },
+      {
+        label: 'Projects',
+        path: '/dashboard/projects',
+        icon: <ProjectIcon />,
+      },
+      {
+        label: 'Support Tickets',
+        path: '/dashboard/tickets',
+        icon: <TicketIcon />,
+      },
     ];
 
-    // Role-specific navigation items
+    // Role-specific items
+    const roleSpecificItems: NavItem[] = [];
+
     if (user?.role === UserRole.SYSTEM_ADMIN) {
-      return [
-        ...baseItems,
-        {
-          label: 'Platform Analytics',
-          path: '/analytics',
-          icon: <AnalyticsIcon />,
-          roles: [UserRole.SYSTEM_ADMIN],
-        },
+      // Automore Level - Full platform access
+      roleSpecificItems.push(
         {
           label: 'Partner Management',
-          path: '/partners',
+          path: '/dashboard/partners',
           icon: <BusinessIcon />,
           roles: [UserRole.SYSTEM_ADMIN],
         },
         {
-          label: 'System Settings',
-          path: '/admin/settings',
-          icon: <SettingsIcon />,
+          label: 'System Analytics',
+          path: '/dashboard/analytics',
+          icon: <AnalyticsIcon />,
           roles: [UserRole.SYSTEM_ADMIN],
         },
         {
           label: 'Admin Panel',
-          path: '/admin',
+          path: '/dashboard/admin',
           icon: <AdminIcon />,
           roles: [UserRole.SYSTEM_ADMIN],
-        },
-      ];
-    }
-
-    if ([UserRole.BUSINESS_ADMIN, UserRole.BUSINESS_USER, UserRole.PARTNER_ADMIN, UserRole.PARTNER_USER].includes(user?.role as UserRole)) {
-      return [
-        ...baseItems,
+        }
+      );
+    } else if ([UserRole.BUSINESS_ADMIN, UserRole.BUSINESS_USER, UserRole.PARTNER_ADMIN, UserRole.PARTNER_USER].includes(user?.role || '' as UserRole)) {
+      // Business/Partner Level - Manage clients and business operations
+      roleSpecificItems.push(
         {
           label: 'Client Management',
-          path: '/clients',
+          path: '/dashboard/clients',
           icon: <PeopleIcon />,
-          roles: [UserRole.BUSINESS_ADMIN, UserRole.PARTNER_ADMIN],
-        },
-        {
-          label: 'Projects',
-          path: '/projects',
-          icon: <ProjectIcon />,
-        },
-        {
-          label: 'Support Tickets',
-          path: '/tickets',
-          icon: <TicketIcon />,
+          roles: [UserRole.BUSINESS_ADMIN, UserRole.BUSINESS_USER, UserRole.PARTNER_ADMIN, UserRole.PARTNER_USER],
         },
         {
           label: 'Invoices',
-          path: '/invoices',
+          path: '/dashboard/invoices',
           icon: <InvoiceIcon />,
+          roles: [UserRole.BUSINESS_ADMIN, UserRole.BUSINESS_USER, UserRole.PARTNER_ADMIN, UserRole.PARTNER_USER],
         },
         {
           label: 'Documents',
-          path: '/documents',
+          path: '/dashboard/documents',
           icon: <DocumentIcon />,
+          roles: [UserRole.BUSINESS_ADMIN, UserRole.BUSINESS_USER, UserRole.PARTNER_ADMIN, UserRole.PARTNER_USER],
         },
-      ];
-    }
-
-    // Client role navigation
-    return [
-      ...baseItems,
-      {
-        label: 'My Projects',
-        path: '/projects',
-        icon: <ProjectIcon />,
-      },
-      {
-        label: 'Support',
-        path: '/tickets',
-        icon: <TicketIcon />,
-      },
-      {
-        label: 'Invoices',
-        path: '/invoices',
-        icon: <InvoiceIcon />,
-      },
-      {
-        label: 'Documents',
-        path: '/documents',
-        icon: <DocumentIcon />,
-      },
-    ];
-  };
-
-  const navItems = getNavItems();
-
-  const renderNavItem = (item: NavItem) => {
-    const isActive = location.pathname === item.path || 
-                    (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
-    
-    const listItemButton = (
-      <ListItemButton
-        onClick={() => navigate(item.path)}
-        sx={{
-          mx: 1,
-          borderRadius: 2,
-          minHeight: 48,
-          justifyContent: isOpen ? 'initial' : 'center',
-          backgroundColor: isActive 
-            ? theme.palette.primary.main 
-            : 'transparent',
-          color: isActive 
-            ? theme.palette.primary.contrastText 
-            : theme.palette.text.primary,
-          '&:hover': {
-            backgroundColor: isActive 
-              ? theme.palette.primary.dark 
-              : theme.palette.action.hover,
-          },
-          transition: 'all 0.2s ease-in-out',
-        }}
-      >
-        <ListItemIcon
-          sx={{
-            minWidth: 0,
-            mr: isOpen ? 2 : 'auto',
-            justifyContent: 'center',
-            color: isActive 
-              ? theme.palette.primary.contrastText 
-              : theme.palette.text.primary,
-          }}
-        >
-          {item.icon}
-        </ListItemIcon>
-        <ListItemText 
-          primary={item.label} 
-          sx={{ 
-            opacity: isOpen ? 1 : 0,
-            transition: 'opacity 0.2s ease-in-out',
-          }} 
-        />
-      </ListItemButton>
-    );
-
-    if (!isOpen) {
-      return (
-        <Tooltip key={item.path} title={item.label} placement="right">
-          <ListItem disablePadding>
-            {listItemButton}
-          </ListItem>
-        </Tooltip>
+        {
+          label: 'Analytics',
+          path: '/dashboard/analytics',
+          icon: <AnalyticsIcon />,
+          roles: [UserRole.BUSINESS_ADMIN, UserRole.BUSINESS_USER, UserRole.PARTNER_ADMIN, UserRole.PARTNER_USER],
+        }
+      );
+    } else if ([UserRole.CLIENT_ADMIN, UserRole.CLIENT_USER].includes(user?.role || '' as UserRole)) {
+      // Client Level - View own projects and manage payments
+      roleSpecificItems.push(
+        {
+          label: 'Invoices',
+          path: '/dashboard/invoices',
+          icon: <InvoiceIcon />,
+          roles: [UserRole.CLIENT_ADMIN, UserRole.CLIENT_USER],
+        },
+        {
+          label: 'Documents',
+          path: '/dashboard/documents',
+          icon: <DocumentIcon />,
+          roles: [UserRole.CLIENT_ADMIN, UserRole.CLIENT_USER],
+        }
       );
     }
 
-    return (
-      <ListItem key={item.path} disablePadding>
-        {listItemButton}
-      </ListItem>
-    );
+    // Settings (available to all users)
+    const settingsItems: NavItem[] = [
+      {
+        label: 'Settings',
+        path: '/dashboard/settings',
+        icon: <SettingsIcon />,
+      },
+    ];
+
+    return [...commonItems, ...roleSpecificItems, ...settingsItems];
   };
+
+  const navigationItems = getNavigationItems();
+
+  // Check if current path matches nav item
+  const isActiveItem = (path: string) => {
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard';
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  // Filter items based on user role
+  const visibleItems = navigationItems.filter(item => {
+    if (!item.roles) return true; // No role restriction
+    return item.roles.includes(user?.role || '' as UserRole);
+  });
 
   return (
     <Drawer
       variant="permanent"
+      open={isOpen}
       sx={{
         width: isOpen ? DRAWER_WIDTH : COLLAPSED_WIDTH,
         flexShrink: 0,
-        whiteSpace: 'nowrap',
-        boxSizing: 'border-box',
         transition: theme.transitions.create('width', {
           easing: theme.transitions.easing.sharp,
           duration: theme.transitions.duration.enteringScreen,
         }),
         '& .MuiDrawer-paper': {
           width: isOpen ? DRAWER_WIDTH : COLLAPSED_WIDTH,
-          boxSizing: 'border-box',
-          backgroundColor: theme.palette.background.paper,
-          borderRight: `1px solid ${theme.palette.divider}`,
           transition: theme.transitions.create('width', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
           overflowX: 'hidden',
+          backgroundColor: theme.palette.background.paper,
+          borderRight: `1px solid ${theme.palette.divider}`,
         },
       }}
     >
       {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: isOpen ? 'space-between' : 'center',
-        p: 2,
-        minHeight: 64,
-      }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isOpen ? 'space-between' : 'center',
+          p: 2,
+          minHeight: 64,
+        }}
+      >
         {isOpen && (
           <Typography
             variant="h6"
             sx={{
-              color: theme.palette.primary.main,
-              fontWeight: 600,
-              fontSize: '20px',
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
             }}
           >
-            Automore
+            Automore Portal
           </Typography>
         )}
-        <IconButton 
+        
+        <IconButton
           onClick={handleToggle}
           sx={{
-            color: theme.palette.text.primary,
+            color: 'text.secondary',
             '&:hover': {
-              backgroundColor: theme.palette.action.hover,
+              backgroundColor: 'action.hover',
             },
           }}
         >
@@ -290,24 +253,87 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User Info */}
       {isOpen && user && (
-        <Box sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
-            Welcome back,
-          </Typography>
-          <Typography variant="subtitle2" fontWeight="bold">
-            {user.firstName} {user.lastName}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {user.role.replace('_', ' ')}
-          </Typography>
+        <Box sx={{ p: 2 }}>
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              backgroundColor: 'action.hover',
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              {user.firstName} {user.lastName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {user.role.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+            </Typography>
+          </Box>
         </Box>
       )}
 
-      <Divider />
-
       {/* Navigation Items */}
-      <List sx={{ flexGrow: 1, pt: 1 }}>
-        {navItems.map(renderNavItem)}
+      <List sx={{ flexGrow: 1, px: 1 }}>
+        {visibleItems.map((item) => {
+          const isActive = isActiveItem(item.path);
+          
+          const listItem = (
+            <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                onClick={() => navigate(item.path)}
+                sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  backgroundColor: isActive ? 'primary.main' : 'transparent',
+                  color: isActive ? 'primary.contrastText' : 'text.primary',
+                  '&:hover': {
+                    backgroundColor: isActive ? 'primary.dark' : 'action.hover',
+                  },
+                  justifyContent: isOpen ? 'initial' : 'center',
+                  px: isOpen ? 2 : 1,
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 0,
+                    mr: isOpen ? 2 : 'auto',
+                    justifyContent: 'center',
+                    color: 'inherit',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                
+                {isOpen && (
+                  <ListItemText
+                    primary={item.label}
+                    sx={{
+                      opacity: isOpen ? 1 : 0,
+                      '& .MuiListItemText-primary': {
+                        fontWeight: isActive ? 600 : 400,
+                      },
+                    }}
+                  />
+                )}
+              </ListItemButton>
+            </ListItem>
+          );
+
+          // Wrap in tooltip when collapsed
+          if (!isOpen) {
+            return (
+              <Tooltip
+                key={item.path}
+                title={item.label}
+                placement="right"
+                arrow
+              >
+                {listItem}
+              </Tooltip>
+            );
+          }
+
+          return listItem;
+        })}
       </List>
     </Drawer>
   );

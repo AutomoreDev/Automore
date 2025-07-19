@@ -101,7 +101,7 @@ export const CreateTicket: React.FC = () => {
   }, [watchedTags]);
 
   const handleBack = useCallback(() => {
-    navigate('/tickets');
+    navigate('/dashboard/tickets');
   }, [navigate]);
 
   const handleFileSelect = useCallback((files: FileList | null) => {
@@ -170,7 +170,7 @@ export const CreateTicket: React.FC = () => {
       };
 
       const newTicket = await createTicket(ticketData);
-      navigate(`/tickets/${newTicket.id}`);
+      navigate(`/dashboard/tickets/${newTicket.id}`);
     } catch (error) {
       console.error('Failed to create ticket:', error);
     }

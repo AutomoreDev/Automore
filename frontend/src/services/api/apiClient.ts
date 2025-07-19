@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { toast } from 'react-toastify';
 
 // Import from your shared types
-import { ApiResponse } from '../../../../shared/types/api';
+import { ApiResponse } from '../../shared/types/api';
 
 class ApiClient {
   private instance: AxiosInstance;

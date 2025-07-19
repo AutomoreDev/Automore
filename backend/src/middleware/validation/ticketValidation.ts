@@ -5,6 +5,28 @@ import { body, validationResult } from 'express-validator';
 import { TicketPriority, TicketCategory, TicketStatus } from '../../types/ticket/ticketTypes';
 
 /**
+ * Middleware to parse JSON fields from FormData
+ */
+export const parseFormDataFields = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.body.tags && typeof req.body.tags === 'string') {
+    try {
+      req.body.tags = JSON.parse(req.body.tags);
+    } catch (error) {
+      // Leave as string for validation to handle
+    }
+  }
+  
+  if (req.body.estimatedHours && typeof req.body.estimatedHours === 'string') {
+    const parsed = parseFloat(req.body.estimatedHours);
+    if (!isNaN(parsed)) {
+      req.body.estimatedHours = parsed;
+    }
+  }
+  
+  next();
+};
+
+/**
  * Validation middleware for ticket creation
  */
 export const validateTicketCreation = [

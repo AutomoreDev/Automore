@@ -185,13 +185,17 @@ export class ProjectController {
 
       res.status(200).json({
         success: true,
-        data: result.projects,
-        pagination: {
-          currentPage: queryParams.page || 1,
-          totalItems: result.totalCount,
-          itemsPerPage: queryParams.limit || 20,
+        data: {
+          projects: result.projects,
+          totalCount: result.totalCount,
           hasNextPage: result.hasNextPage,
-          hasPreviousPage: (queryParams.page || 1) > 1
+          pagination: {
+            currentPage: queryParams.page || 1,
+            totalItems: result.totalCount,
+            itemsPerPage: queryParams.limit || 20,
+            hasNextPage: result.hasNextPage,
+            hasPreviousPage: (queryParams.page || 1) > 1
+          }
         }
       });
     } catch (error: any) {
@@ -346,11 +350,18 @@ export class ProjectController {
       // Calculate summary statistics
       const dashboardData = {
         totalProjects: activeProjects.totalCount + completedProjects.totalCount,
-        activeProjects: activeProjects.totalCount,
+        activeProjects: activeProjects.projects.slice(0, 10), // Return actual projects array
         completedProjects: completedProjects.totalCount,
         
         // Recent projects
         recentProjects: activeProjects.projects.slice(0, 5),
+        
+        // Missing fields expected by frontend
+        completedThisMonth: 0,
+        totalBudgetThisMonth: 0,
+        overdueMilestones: [],
+        pendingApprovals: [],
+        teamProductivity: [],
         
         // Projects by status
         projectsByStatus: [
@@ -393,17 +404,17 @@ export class ProjectController {
       
       const allProjects = await this.projectService.getProjects(allProjectsQuery, user);
       
-      // Calculate statistics
+      // Calculate statistics with null safety
       const statistics = {
         totalProjects: allProjects.totalCount,
-        totalBudget: allProjects.projects.reduce((sum, p) => sum + p.budget, 0),
+        totalBudget: allProjects.projects.reduce((sum, p) => sum + (p.budget || 0), 0),
         averageBudget: allProjects.projects.length > 0 
-          ? allProjects.projects.reduce((sum, p) => sum + p.budget, 0) / allProjects.projects.length 
+          ? allProjects.projects.reduce((sum, p) => sum + (p.budget || 0), 0) / allProjects.projects.length 
           : 0,
-        totalEstimatedHours: allProjects.projects.reduce((sum, p) => sum + p.estimatedHours, 0),
-        totalActualHours: allProjects.projects.reduce((sum, p) => sum + p.actualHours, 0),
+        totalEstimatedHours: allProjects.projects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0),
+        totalActualHours: allProjects.projects.reduce((sum, p) => sum + (p.actualHours || 0), 0),
         averageCompletion: allProjects.projects.length > 0
-          ? allProjects.projects.reduce((sum, p) => sum + p.completionPercentage, 0) / allProjects.projects.length
+          ? allProjects.projects.reduce((sum, p) => sum + (p.completionPercentage || 0), 0) / allProjects.projects.length
           : 0,
         
         // Distribution by type
@@ -416,7 +427,11 @@ export class ProjectController {
         projectsByPriority: Object.values(ProjectPriority).map(priority => ({
           priority,
           count: allProjects.projects.filter(p => p.priority === priority).length
-        }))
+        })),
+        
+        // Additional statistics
+        activeProjects: allProjects.projects.filter(p => p.status === ProjectStatus.ACTIVE).length,
+        completedProjects: allProjects.projects.filter(p => p.status === ProjectStatus.COMPLETED).length
       };
 
       res.status(200).json({

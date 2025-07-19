@@ -10,7 +10,6 @@ import {
   TicketStatistics,
   TicketMessage,
 } from '../../types/ticket';
-import { ApiResponse } from '../../shared/types/api';
 
 export class TicketApiService {
   
@@ -34,15 +33,15 @@ export class TicketApiService {
       });
     }
     
-    const response = await apiClient.get<ApiResponse<PaginatedTickets>>(
+    const response = await apiClient.get<PaginatedTickets>(
       `/tickets?${searchParams.toString()}`
     );
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('No data received from server');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
@@ -63,15 +62,15 @@ export class TicketApiService {
       });
     }
     
-    const response = await apiClient.get<ApiResponse<PaginatedTickets>>(
+    const response = await apiClient.get<PaginatedTickets>(
       `/tickets/my-tickets?${searchParams.toString()}`
     );
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('No data received from server');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
@@ -92,28 +91,28 @@ export class TicketApiService {
       });
     }
     
-    const response = await apiClient.get<ApiResponse<PaginatedTickets>>(
+    const response = await apiClient.get<PaginatedTickets>(
       `/tickets/my-created-tickets?${searchParams.toString()}`
     );
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('No data received from server');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
    * Get a specific ticket by ID
    */
   async getTicketById(id: string): Promise<Ticket> {
-    const response = await apiClient.get<ApiResponse<Ticket>>(`/tickets/${id}`);
+    const response = await apiClient.get<Ticket>(`/tickets/${id}`);
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Ticket not found');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
@@ -127,7 +126,7 @@ export class TicketApiService {
     formData.append('description', ticketData.description);
     formData.append('priority', ticketData.priority);
     formData.append('category', ticketData.category);
-    formData.append('tags', JSON.stringify(ticketData.tags));
+    formData.append('tags', JSON.stringify(ticketData.tags || []));
     
     if (ticketData.estimatedHours) {
       formData.append('estimatedHours', ticketData.estimatedHours.toString());
@@ -139,35 +138,35 @@ export class TicketApiService {
     
     // Add attachments
     if (ticketData.attachments) {
-      ticketData.attachments.forEach((file, index) => {
+      ticketData.attachments.forEach((file) => {
         formData.append(`attachments`, file);
       });
     }
     
-    const response = await apiClient.post<ApiResponse<Ticket>>('/tickets', formData, {
+    const response = await apiClient.post<Ticket>('/tickets', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to create ticket');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
    * Update an existing ticket
    */
   async updateTicket(id: string, updates: UpdateTicketForm): Promise<Ticket> {
-    const response = await apiClient.put<ApiResponse<Ticket>>(`/tickets/${id}`, updates);
+    const response = await apiClient.put<Ticket>(`/tickets/${id}`, updates);
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to update ticket');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
@@ -183,13 +182,13 @@ export class TicketApiService {
    * Get all messages for a ticket
    */
   async getTicketMessages(ticketId: string): Promise<TicketMessage[]> {
-    const response = await apiClient.get<ApiResponse<TicketMessage[]>>(`/tickets/${ticketId}/messages`);
+    const response = await apiClient.get<TicketMessage[]>(`/tickets/${ticketId}/messages`);
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to load messages');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
@@ -206,7 +205,7 @@ export class TicketApiService {
       });
     }
     
-    const response = await apiClient.post<ApiResponse<TicketMessage>>(
+    const response = await apiClient.post<TicketMessage>(
       `/tickets/${ticketId}/messages`,
       formData,
       {
@@ -216,11 +215,11 @@ export class TicketApiService {
       }
     );
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to send message');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   // ==================== TICKET ATTACHMENTS ====================
@@ -250,39 +249,39 @@ export class TicketApiService {
    * Get ticket statistics
    */
   async getTicketStatistics(): Promise<TicketStatistics> {
-    const response = await apiClient.get<ApiResponse<TicketStatistics>>('/tickets/statistics');
+    const response = await apiClient.get<TicketStatistics>('/tickets/statistics');
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to load statistics');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
    * Get ticket statistics for a specific user
    */
   async getUserTicketStatistics(userId: string): Promise<TicketStatistics> {
-    const response = await apiClient.get<ApiResponse<TicketStatistics>>(`/tickets/statistics/user/${userId}`);
+    const response = await apiClient.get<TicketStatistics>(`/tickets/statistics/user/${userId}`);
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to load user statistics');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 
   /**
    * Get ticket statistics for a company
    */
   async getCompanyTicketStatistics(companyId: string): Promise<TicketStatistics> {
-    const response = await apiClient.get<ApiResponse<TicketStatistics>>(`/tickets/statistics/company/${companyId}`);
+    const response = await apiClient.get<TicketStatistics>(`/tickets/statistics/company/${companyId}`);
     
-    if (!response.data?.data) {
+    if (!response.success || !response.data) {
       throw new Error('Failed to load company statistics');
     }
     
-    return response.data.data;
+    return response.data!;
   }
 }
 

@@ -77,7 +77,7 @@ import {
   
         // Auto-assign if enabled
         if (process.env.TICKET_AUTO_ASSIGN === 'true') {
-          await this.autoAssignTicket(docRef.id, user.companyId!, ticketData.category);
+          await this.autoAssignTicket(docRef.id, user.companyId!, ticketData.category, user.uid);
         }
   
         // Return the created ticket
@@ -190,6 +190,7 @@ import {
       user: AuthUser
     ): Promise<PaginatedTicketsResponse> {
       try {
+        // Start with a basic query
         let query: Query = this.db.collection(this.ticketsCollection);
   
         // Apply filters based on user role and company
@@ -200,22 +201,39 @@ import {
         const countSnapshot = await query.get();
         const totalCount = countSnapshot.size;
   
+        // If no tickets found, return empty result
+        if (totalCount === 0) {
+          return {
+            tickets: [],
+            totalCount: 0,
+            currentPage: 1,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false
+          };
+        }
+  
         // Apply sorting
         const sortBy = queryParams.sortBy || 'createdAt';
         const sortOrder = queryParams.sortOrder || 'desc';
-        query = query.orderBy(sortBy, sortOrder);
+        
+        // Create a new query for pagination (since we already used the first one)
+        let paginatedQuery: Query = this.db.collection(this.ticketsCollection);
+        paginatedQuery = this.applyAccessFilters(paginatedQuery, user);
+        paginatedQuery = this.applyQueryFilters(paginatedQuery, queryParams);
+        paginatedQuery = paginatedQuery.orderBy(sortBy, sortOrder);
   
         // Apply pagination
         const limit = queryParams.limit || 20;
         const offset = queryParams.offset || 0;
         
         if (offset > 0) {
-          query = query.offset(offset);
+          paginatedQuery = paginatedQuery.offset(offset);
         }
-        query = query.limit(limit);
+        paginatedQuery = paginatedQuery.limit(limit);
   
         // Execute query
-        const snapshot = await query.get();
+        const snapshot = await paginatedQuery.get();
         
         // Transform results
         const tickets = await Promise.all(
@@ -405,15 +423,451 @@ import {
     private async autoAssignTicket(
       ticketId: string, 
       companyId: string, 
-      category: TicketCategory
+      category: TicketCategory,
+      creatorId?: string
     ): Promise<void> {
-      // TODO: Implement auto-assignment logic
-      // This would query for available support agents based on:
-      // - Category expertise
-      // - Current workload
-      // - Online status
-      // - Company assignment
-      console.log(`Auto-assignment needed for ticket ${ticketId} in company ${companyId} for category ${category}`);
+      try {
+        console.log(`Starting auto-assignment for ticket ${ticketId} in company ${companyId} for category ${category}`);
+        
+        // Find available support agents for this company
+        const availableAgents = await this.findAvailableSupportAgents(companyId, category);
+        
+        if (availableAgents.length === 0) {
+          console.log(`No available agents found for company ${companyId} and category ${category}`);
+          console.log(`Ticket ${ticketId} will remain unassigned - can be assigned manually later`);
+          
+          // Create a system message indicating the ticket is unassigned
+          await this.createSystemMessage(
+            ticketId,
+            'Ticket created - no available agents for auto-assignment. Manual assignment required.',
+            creatorId || 'system'
+          );
+          return;
+        }
+
+        // Select the best agent based on workload and expertise
+        const selectedAgent = await this.selectBestAgent(availableAgents);
+        
+        if (!selectedAgent) {
+          console.log(`No suitable agent found for ticket assignment`);
+          return;
+        }
+
+        // Assign the ticket
+        await this.assignTicketToAgent(ticketId, selectedAgent.uid, selectedAgent.firstName, selectedAgent.lastName);
+        
+        console.log(`Successfully auto-assigned ticket ${ticketId} to agent ${selectedAgent.uid} (${selectedAgent.firstName} ${selectedAgent.lastName})`);
+        
+      } catch (error) {
+        console.error(`Error during auto-assignment for ticket ${ticketId}:`, error);
+        // Don't throw error - auto-assignment failure shouldn't break ticket creation
+      }
+    }
+
+    /**
+     * Find available support agents for a company and category
+     */
+    private async findAvailableSupportAgents(companyId: string, category: TicketCategory): Promise<any[]> {
+      try {
+        // First, try to find support agents with admin roles
+        let usersQuery = this.db.collection('users')
+          .where('companyId', '==', companyId)
+          .where('role', 'in', ['BUSINESS_ADMIN', 'CLIENT_ADMIN']) // Support agents
+          .where('status', '==', 'active');
+
+        let usersSnapshot = await usersQuery.get();
+        
+        // If no admin agents found, try to find any active users in the company
+        if (usersSnapshot.empty) {
+          console.log(`No admin agents found, looking for any active users in company ${companyId}`);
+          usersQuery = this.db.collection('users')
+            .where('companyId', '==', companyId)
+            .where('status', '==', 'active');
+          
+          usersSnapshot = await usersQuery.get();
+        }
+        
+        // If still no users found, check if there are any users at all in the company
+        if (usersSnapshot.empty) {
+          console.log(`No active users found, checking for any users in company ${companyId}`);
+          usersQuery = this.db.collection('users')
+            .where('companyId', '==', companyId);
+          
+          usersSnapshot = await usersQuery.get();
+          
+          if (usersSnapshot.empty) {
+            console.log(`No users found at all in company ${companyId}`);
+            return [];
+          } else {
+            console.log(`Found ${usersSnapshot.size} inactive users in company, but none are active`);
+            return [];
+          }
+        }
+
+        const agents = usersSnapshot.docs.map(doc => ({
+          uid: doc.id,
+          ...doc.data()
+        }));
+
+        console.log(`Found ${agents.length} potential agents for assignment`);
+
+        // Filter agents based on category expertise (if configured)
+        const suitableAgents = agents.filter(agent => 
+          this.isAgentSuitableForCategory(agent, category)
+        );
+
+        return suitableAgents.length > 0 ? suitableAgents : agents; // Fallback to all agents if no specific expertise
+        
+      } catch (error) {
+        console.error('Error finding available support agents:', error);
+        return [];
+      }
+    }
+
+    /**
+     * Check if an agent is suitable for a specific category
+     */
+    private isAgentSuitableForCategory(agent: any, category: TicketCategory): boolean {
+      // Check if agent has category expertise defined
+      if (agent.categoryExpertise && Array.isArray(agent.categoryExpertise)) {
+        return agent.categoryExpertise.includes(category);
+      }
+      
+      // If no expertise defined, agent can handle any category
+      return true;
+    }
+
+    /**
+     * Select the best agent based on current workload
+     */
+    private async selectBestAgent(agents: any[]): Promise<any | null> {
+      if (agents.length === 0) return null;
+      
+      try {
+        // Get current workload for each agent
+        const agentsWithWorkload = await Promise.all(
+          agents.map(async (agent) => {
+            const workload = await this.getAgentCurrentWorkload(agent.uid);
+            return {
+              ...agent,
+              currentWorkload: workload
+            };
+          })
+        );
+
+        // Sort by workload (ascending) and return the agent with least workload
+        agentsWithWorkload.sort((a, b) => a.currentWorkload - b.currentWorkload);
+        
+        return agentsWithWorkload[0];
+        
+      } catch (error) {
+        console.error('Error selecting best agent:', error);
+        // Fallback to random selection
+        return agents[Math.floor(Math.random() * agents.length)];
+      }
+    }
+
+    /**
+     * Get current workload (number of open/in-progress tickets) for an agent
+     */
+    private async getAgentCurrentWorkload(agentId: string): Promise<number> {
+      try {
+        const workloadQuery = this.db.collection(this.ticketsCollection)
+          .where('assignedTo', '==', agentId)
+          .where('status', 'in', [TicketStatus.OPEN, TicketStatus.IN_PROGRESS]);
+
+        const snapshot = await workloadQuery.get();
+        return snapshot.size;
+        
+      } catch (error) {
+        console.error(`Error getting workload for agent ${agentId}:`, error);
+        return 0;
+      }
+    }
+
+    /**
+     * Assign ticket to a specific agent
+     */
+    private async assignTicketToAgent(
+      ticketId: string, 
+      agentId: string, 
+      agentFirstName: string, 
+      agentLastName: string
+    ): Promise<void> {
+      const ticketRef = this.db.collection(this.ticketsCollection).doc(ticketId);
+      
+      await ticketRef.update({
+        assignedTo: agentId,
+        updatedAt: Timestamp.now(),
+        lastActivityAt: Timestamp.now()
+      });
+
+      // Create system message about assignment
+      await this.createSystemMessage(
+        ticketId,
+        `Ticket auto-assigned to ${agentFirstName} ${agentLastName}`,
+        agentId
+      );
+    }
+
+    /**
+     * Get all messages for a ticket
+     */
+    async getTicketMessages(ticketId: string, user: AuthUser): Promise<any[]> {
+      try {
+        // First verify user can access this ticket
+        await this.getTicketById(ticketId, user);
+        
+        // Get messages for this ticket (simplified query to avoid index issues)
+        const messagesQuery = this.db.collection(this.messagesCollection)
+          .where('ticketId', '==', ticketId);
+
+        const snapshot = await messagesQuery.get();
+        
+        if (snapshot.empty) {
+          return [];
+        }
+
+        // Collect all unique sender IDs to avoid N+1 queries
+        const senderIds = [...new Set(
+          snapshot.docs
+            .map(doc => doc.data().senderId)
+            .filter(id => id)
+        )];
+        
+        // Batch fetch all senders in a single query
+        const sendersMap = new Map();
+        if (senderIds.length > 0) {
+          try {
+            // Split into chunks of 10 for Firestore 'in' query limit
+            const chunkSize = 10;
+            for (let i = 0; i < senderIds.length; i += chunkSize) {
+              const chunk = senderIds.slice(i, i + chunkSize);
+              const senderDocs = await this.db.collection('users')
+                .where('__name__', 'in', chunk)
+                .get();
+              
+              senderDocs.docs.forEach(doc => {
+                const senderData = doc.data();
+                sendersMap.set(doc.id, {
+                  uid: doc.id,
+                  firstName: senderData?.firstName || 'Unknown',
+                  lastName: senderData?.lastName || 'User',
+                  email: senderData?.email || '',
+                  role: senderData?.role || ''
+                });
+              });
+            }
+          } catch (error) {
+            console.error('Error batch fetching sender data:', error);
+          }
+        }
+        
+        // Transform messages with cached sender data
+        const messages = snapshot.docs.map((doc) => {
+          const docData = doc.data();
+          const sender = sendersMap.get(docData.senderId) || null;
+          
+          return {
+            id: doc.id,
+            ...docData,
+            sender,
+            createdAt: docData.createdAt?.toDate().toISOString(),
+            editedAt: docData.editedAt?.toDate().toISOString()
+          };
+        });
+
+        // Sort messages by creation date (oldest first)
+        messages.sort((a, b) => {
+          if (!a.createdAt || !b.createdAt) return 0;
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+
+        return messages;
+        
+      } catch (error) {
+        console.error('Error getting ticket messages:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Create a new message for a ticket
+     */
+    async createTicketMessage(ticketId: string, messageData: { message: string }, user: AuthUser, attachments?: any[]): Promise<any> {
+      try {
+        // First verify user can access this ticket
+        await this.getTicketById(ticketId, user);
+        
+        // Process attachments if any
+        const processedAttachments = attachments ? attachments.map(file => ({
+          id: `${Date.now()}_${file.originalname}`,
+          filename: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          path: file.path,
+          uploadedAt: new Date().toISOString()
+        })) : [];
+        
+        // Create the message
+        const messageDoc = {
+          ticketId,
+          senderId: user.uid,
+          message: messageData.message,
+          type: 'user_message',
+          attachments: processedAttachments,
+          createdAt: Timestamp.now(),
+          editedAt: null
+        };
+
+        const docRef = await this.db.collection(this.messagesCollection).add(messageDoc);
+        
+        // Update ticket's last activity
+        await this.db.collection(this.ticketsCollection).doc(ticketId).update({
+          lastActivityAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+
+        // Return the created message with populated sender
+        const createdMessage = await docRef.get();
+        const createdMessageData = createdMessage.data();
+        
+        // Populate sender information
+        const sender = {
+          uid: user.uid,
+          firstName: user.firstName || 'Unknown',
+          lastName: user.lastName || 'User',
+          email: user.email || '',
+          role: user.role || ''
+        };
+        
+        return {
+          id: createdMessage.id,
+          ...createdMessageData,
+          sender,
+          createdAt: createdMessageData?.createdAt?.toDate().toISOString(),
+          editedAt: createdMessageData?.editedAt?.toDate().toISOString()
+        };
+        
+      } catch (error) {
+        console.error('Error creating ticket message:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Manually assign ticket to a user
+     */
+    async assignTicket(ticketId: string, assignedTo: string | null, user: AuthUser): Promise<any> {
+      try {
+        // First verify user can access this ticket
+        const ticketDoc = await this.db.collection(this.ticketsCollection).doc(ticketId).get();
+        
+        if (!ticketDoc.exists) {
+          throw new Error('Ticket not found');
+        }
+
+        const ticket = ticketDoc.data() as TicketDocument;
+        
+        // Check access permissions
+        if (!this.canAccessTicket(ticket, user)) {
+          throw new Error('Access denied');
+        }
+        
+        // Check if user can modify tickets
+        if (!this.canModifyTicket(ticket, user)) {
+          throw new Error('Access denied');
+        }
+        
+        // If assigning to someone, validate the assignee
+        if (assignedTo) {
+          await this.validateAssignee(assignedTo, user.companyId!);
+        }
+        
+        // Update the ticket
+        const ticketRef = this.db.collection(this.ticketsCollection).doc(ticketId);
+        await ticketRef.update({
+          assignedTo: assignedTo,
+          updatedAt: Timestamp.now(),
+          lastActivityAt: Timestamp.now()
+        });
+
+        // Create system message about assignment change
+        const message = assignedTo 
+          ? `Ticket manually assigned to user ${assignedTo}`
+          : 'Ticket unassigned';
+          
+        await this.createSystemMessage(ticketId, message, user.uid);
+        
+        // Return updated ticket
+        return await this.getTicketById(ticketId, user);
+        
+      } catch (error) {
+        console.error('Error assigning ticket:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Validate that a user can be assigned to a ticket
+     */
+    private async validateAssignee(assigneeId: string, companyId: string): Promise<void> {
+      try {
+        const userDoc = await this.db.collection('users').doc(assigneeId).get();
+        
+        if (!userDoc.exists) {
+          throw new Error('Invalid assignee - user not found');
+        }
+        
+        const userData = userDoc.data();
+        
+        if (userData?.companyId !== companyId) {
+          throw new Error('Invalid assignee - user not in same company');
+        }
+        
+        if (userData?.status !== 'active') {
+          throw new Error('Invalid assignee - user is not active');
+        }
+        
+      } catch (error) {
+        console.error('Error validating assignee:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Get available support agents for manual assignment
+     */
+    async getAvailableAgents(companyId: string): Promise<any[]> {
+      try {
+        const agents = await this.findAvailableSupportAgents(companyId, TicketCategory.GENERAL);
+        
+        // Get workload for each agent and return formatted data
+        const agentsWithWorkload = await Promise.all(
+          agents.map(async (agent) => {
+            const workload = await this.getAgentCurrentWorkload(agent.uid);
+            return {
+              uid: agent.uid,
+              firstName: agent.firstName,
+              lastName: agent.lastName,
+              email: agent.email,
+              role: agent.role,
+              currentWorkload: workload,
+              categoryExpertise: agent.categoryExpertise || [],
+              status: agent.status || 'active'
+            };
+          })
+        );
+
+        // Sort by workload (ascending)
+        agentsWithWorkload.sort((a, b) => a.currentWorkload - b.currentWorkload);
+        
+        return agentsWithWorkload;
+        
+      } catch (error) {
+        console.error('Error getting available agents:', error);
+        throw new Error('Failed to fetch available agents');
+      }
     }
   
     /**
@@ -427,6 +881,13 @@ import {
       // 4. They are a system admin
       
       if (user.role === 'SYSTEM_ADMIN') return true;
+      
+      // If user has no companyId, they can only access their own tickets
+      if (!user.companyId) {
+        return ticket.createdBy === user.uid || ticket.assignedTo === user.uid;
+      }
+      
+      // Company-based access control
       if (ticket.companyId !== user.companyId) return false;
       if (ticket.createdBy === user.uid) return true;
       if (ticket.assignedTo === user.uid) return true;
@@ -450,6 +911,11 @@ import {
     private canDeleteTicket(ticket: TicketDocument, user: AuthUser): boolean {
       // Only admins can delete tickets
       if (user.role === 'SYSTEM_ADMIN') return true;
+      
+      // If user has no companyId, they can't delete tickets
+      if (!user.companyId) return false;
+      
+      // Company-based delete control
       if (ticket.companyId !== user.companyId) return false;
       if (user.role === 'BUSINESS_ADMIN' || user.role === 'CLIENT_ADMIN') return true;
       
@@ -465,8 +931,10 @@ import {
         return query;
       }
       
-      // Filter by company
-      query = query.where('companyId', '==', user.companyId);
+      // Filter by company (only if user has a companyId)
+      if (user.companyId) {
+        query = query.where('companyId', '==', user.companyId);
+      }
       
       // Non-admin users can only see their own tickets or assigned tickets
       if (user.role !== 'BUSINESS_ADMIN' && user.role !== 'CLIENT_ADMIN') {

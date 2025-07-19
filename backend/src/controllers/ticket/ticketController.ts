@@ -55,7 +55,8 @@ export class TicketController {
       res.status(201).json({
         success: true,
         message: 'Ticket created successfully',
-        data: ticket
+        data: ticket,
+        timestamp: new Date().toISOString()
       });
     } catch (error: any) {
       console.error('Error in createTicket:', error);
@@ -358,6 +359,214 @@ export class TicketController {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch created tickets'
+      });
+    }
+  };
+
+  /**
+   * Get available support agents for ticket assignment
+   * GET /api/v1/tickets/available-agents
+   */
+  getAvailableAgents = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const user = req.user as AuthUser;
+      
+      // Only admins can view available agents
+      if (user.role !== 'BUSINESS_ADMIN' && user.role !== 'CLIENT_ADMIN' && user.role !== 'SYSTEM_ADMIN') {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+        return;
+      }
+
+      const agents = await this.ticketService.getAvailableAgents(user.companyId!);
+
+      res.status(200).json({
+        success: true,
+        data: agents
+      });
+    } catch (error: any) {
+      console.error('Error in getAvailableAgents:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch available agents'
+      });
+    }
+  };
+
+  /**
+   * Get all messages for a ticket
+   * GET /api/v1/tickets/:id/messages
+   */
+  getTicketMessages = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const user = req.user as AuthUser;
+      const { id } = req.params;
+
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          message: 'Ticket ID is required'
+        });
+        return;
+      }
+
+      const messages = await this.ticketService.getTicketMessages(id, user);
+
+      res.status(200).json({
+        success: true,
+        data: messages
+      });
+    } catch (error: any) {
+      console.error('Error in getTicketMessages:', error);
+      
+      if (error.message === 'Ticket not found') {
+        res.status(404).json({
+          success: false,
+          message: 'Ticket not found'
+        });
+        return;
+      }
+      
+      if (error.message === 'Access denied') {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to load messages'
+      });
+    }
+  };
+
+  /**
+   * Create a new message for a ticket
+   * POST /api/v1/tickets/:id/messages
+   */
+  createTicketMessage = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const user = req.user as AuthUser;
+      const { id } = req.params;
+      const { message } = req.body;
+
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          message: 'Ticket ID is required'
+        });
+        return;
+      }
+
+      if (!message || message.trim().length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Message is required'
+        });
+        return;
+      }
+
+      const newMessage = await this.ticketService.createTicketMessage(id, { message }, user, req.files as any[]);
+
+      res.status(201).json({
+        success: true,
+        message: 'Message created successfully',
+        data: newMessage
+      });
+    } catch (error: any) {
+      console.error('Error in createTicketMessage:', error);
+      
+      if (error.message === 'Ticket not found') {
+        res.status(404).json({
+          success: false,
+          message: 'Ticket not found'
+        });
+        return;
+      }
+      
+      if (error.message === 'Access denied') {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create message'
+      });
+    }
+  };
+
+  /**
+   * Assign ticket to a user
+   * PUT /api/v1/tickets/:id/assign
+   */
+  assignTicket = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const user = req.user as AuthUser;
+      const { id } = req.params;
+      const { assignedTo } = req.body;
+
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          message: 'Ticket ID is required'
+        });
+        return;
+      }
+
+      // Only admins can assign tickets
+      if (user.role !== 'BUSINESS_ADMIN' && user.role !== 'CLIENT_ADMIN' && user.role !== 'SYSTEM_ADMIN') {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied - admin privileges required'
+        });
+        return;
+      }
+
+      const updatedTicket = await this.ticketService.assignTicket(id, assignedTo, user);
+
+      res.status(200).json({
+        success: true,
+        message: assignedTo ? 'Ticket assigned successfully' : 'Ticket unassigned successfully',
+        data: updatedTicket
+      });
+    } catch (error: any) {
+      console.error('Error in assignTicket:', error);
+      
+      if (error.message === 'Ticket not found') {
+        res.status(404).json({
+          success: false,
+          message: 'Ticket not found'
+        });
+        return;
+      }
+      
+      if (error.message === 'Access denied') {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+        return;
+      }
+
+      if (error.message.includes('Invalid assignee')) {
+        res.status(400).json({
+          success: false,
+          message: error.message
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to assign ticket'
       });
     }
   };
