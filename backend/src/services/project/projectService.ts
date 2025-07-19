@@ -262,10 +262,14 @@ import {
         // Apply company filter based on user role
         if (this.isClientUser(user)) {
           // Client users can only see their own projects
-          query = query.where('clientId', '==', user.companyId);
+          if (user.companyId) {
+            query = query.where('clientId', '==', user.companyId);
+          }
         } else {
           // Business users see projects in their company
-          query = query.where('companyId', '==', user.companyId);
+          if (user.companyId) {
+            query = query.where('companyId', '==', user.companyId);
+          }
         }
   
         // Apply filters
@@ -334,7 +338,10 @@ import {
         }
   
         // Get total count (this could be cached for better performance)
-        const countQuery = this.projectsCollection.where('companyId', '==', user.companyId);
+        let countQuery: Query<ProjectDocument> = this.projectsCollection;
+        if (user.companyId) {
+          countQuery = countQuery.where('companyId', '==', user.companyId);
+        }
         const countSnapshot = await countQuery.count().get();
         const totalCount = countSnapshot.data().count;
   

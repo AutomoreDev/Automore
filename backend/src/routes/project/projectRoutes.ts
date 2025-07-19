@@ -3,9 +3,9 @@
 import { Router } from 'express';
 import { ProjectController } from '../../controllers/project/projectController';
 // Import your existing middleware (corrected imports)
-import { firebaseAuthMiddleware } from '../../middleware/auth/authMiddleware';
+import { jwtAuthMiddleware } from '../../middleware/auth/authMiddleware';
 import { requirePermission, requireAnyPermission } from '../../middleware/auth/permissionMiddleware';
-import { requireRole } from '../../middleware/auth/roleMiddleware';
+import { requireBusinessRole } from '../../middleware/auth/roleMiddleware';
 import { rateLimitMiddleware } from '../../middleware/security/rateLimitMiddleware';
 // Import project-specific middleware
 import { validateProjectAccess } from '../../middleware/project/projectMiddleware';
@@ -21,7 +21,15 @@ const router = Router();
 const projectController = new ProjectController();
 
 // Apply authentication to all routes
-router.use(firebaseAuthMiddleware);
+router.use(jwtAuthMiddleware);
+
+// Disable ETags for all project routes to prevent 304 responses
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
 
 // ==================== PROJECT CRUD ROUTES ====================
 
@@ -70,7 +78,7 @@ router.get(
 router.get(
   '/statistics',
   rateLimitMiddleware(20, 1), // 20 requests per minute
-  requireAnyPermission(['BUSINESS_ADMIN', 'BUSINESS_USER']),
+  requireBusinessRole,
   projectController.getProjectStatistics
 );
 

@@ -24,6 +24,7 @@ interface MessageThreadProps {
 }
 
 const getFileIcon = (mimeType: string) => {
+  if (!mimeType || typeof mimeType !== 'string') return <FileIcon />;
   if (mimeType.startsWith('image/')) return <ImageIcon />;
   if (mimeType === 'application/pdf') return <PdfIcon />;
   return <FileIcon />;

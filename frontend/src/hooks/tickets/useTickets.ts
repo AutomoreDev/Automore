@@ -1,5 +1,5 @@
 // frontend/src/hooks/ticket/useTickets.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ticketApi } from '../../services/api/ticketApi';
 import {
   Ticket,
@@ -39,6 +39,14 @@ export const useTickets = (initialParams?: TicketQueryParams): UseTicketsReturn 
     hasPreviousPage: false,
   });
 
+  // Serialize params to create a stable reference
+  const paramsKey = useMemo(() => 
+    JSON.stringify(initialParams), 
+    [initialParams]
+  );
+
+  const memoizedParams = useMemo(() => initialParams, [paramsKey]);
+
   const fetchTickets = useCallback(async (params?: TicketQueryParams) => {
     try {
       setLoading(true);
@@ -63,12 +71,12 @@ export const useTickets = (initialParams?: TicketQueryParams): UseTicketsReturn 
   }, []);
 
   const refetch = useCallback(() => {
-    return fetchTickets(initialParams);
-  }, [fetchTickets, initialParams]);
+    return fetchTickets(memoizedParams);
+  }, [fetchTickets, memoizedParams]);
 
   useEffect(() => {
-    fetchTickets(initialParams);
-  }, [fetchTickets, initialParams]);
+    fetchTickets(memoizedParams);
+  }, [fetchTickets, memoizedParams]);
 
   return {
     tickets,
@@ -142,9 +150,9 @@ export const useTicket = (ticketId: string): UseTicketReturn => {
 
     try {
       await ticketApi.deleteTicket(ticket.id);
-      toast.success('Ticket deleted successfully');
+      toast.success('Ticket has been updated to closed');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete ticket');
+      toast.error(err.message || 'Failed to close ticket');
       throw err;
     }
   }, [ticket]);

@@ -1,5 +1,5 @@
 // frontend/src/components/tickets/TicketsList/TicketsList.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -85,7 +85,6 @@ interface TicketsFilters {
 export const TicketsList: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   // Filter state
   const [filters, setFilters] = useState<TicketsFilters>({
@@ -100,7 +99,7 @@ export const TicketsList: React.FC = () => {
   const limit = 10;
 
   // Build query parameters
-  const queryParams: TicketQueryParams = {
+  const queryParams: TicketQueryParams = useMemo(() => ({
     search: filters.search || undefined,
     status: filters.status.length > 0 ? filters.status : undefined,
     priority: filters.priority.length > 0 ? filters.priority : undefined,
@@ -109,9 +108,9 @@ export const TicketsList: React.FC = () => {
     offset: (currentPage - 1) * limit,
     sortBy: 'updatedAt',
     sortOrder: 'desc',
-  };
+  }), [filters.search, filters.status, filters.priority, filters.category, limit, currentPage]);
 
-  const { tickets, loading, error, totalPages, fetchTickets, refetch } = useTickets(queryParams);
+  const { tickets, loading, error, totalPages, refetch } = useTickets(queryParams);
 
   // Handle filter changes
   const handleSearchChange = useCallback((value: string) => {
@@ -134,16 +133,26 @@ export const TicketsList: React.FC = () => {
     setCurrentPage(1);
   }, []);
 
+  const showClosedTickets = useCallback(() => {
+    setFilters({
+      search: '',
+      status: [TicketStatus.CLOSED],
+      priority: [],
+      category: [],
+    });
+    setCurrentPage(1);
+  }, []);
+
   const handlePageChange = useCallback((_: React.ChangeEvent<unknown>, page: number) => {
     setCurrentPage(page);
   }, []);
 
   const handleTicketClick = useCallback((ticketId: string) => {
-    navigate(`/tickets/${ticketId}`);
+    navigate(`/dashboard/tickets/${ticketId}`);
   }, [navigate]);
 
   const handleCreateTicket = useCallback(() => {
-    navigate('/tickets/create');
+    navigate('/dashboard/tickets/create');
   }, [navigate]);
 
   // Render ticket card
@@ -293,6 +302,12 @@ export const TicketsList: React.FC = () => {
                 onClick={() => setShowFilters(!showFilters)}
               >
                 Filters
+              </Button>
+              <Button
+                variant={filters.status.length === 1 && filters.status[0] === TicketStatus.CLOSED ? "contained" : "outlined"}
+                onClick={showClosedTickets}
+              >
+                Closed Tickets
               </Button>
               {(filters.status.length > 0 || filters.priority.length > 0 || filters.category.length > 0) && (
                 <Button variant="outlined" onClick={clearFilters}>

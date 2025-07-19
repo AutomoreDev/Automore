@@ -18,6 +18,9 @@ import {
     AssignmentStatus
   } from '../../shared/enums/project';
   
+  // Re-export all enums and labels from shared location
+  export * from '../../shared/enums/project';
+  
   // ==================== CORE PROJECT INTERFACES ====================
   
   export interface Project {
@@ -185,22 +188,9 @@ import {
     createdByUser?: ProjectUser;
     milestone?: ProjectMilestone | null;
     timeEntries?: ProjectTimeEntry[];
-    comments?: TaskComment[];
   }
   
-  export interface TaskComment {
-    id: string;
-    taskId: string;
-    userId: string;
-    comment: string;
-    createdAt: string;
-    editedAt: string | null;
-    
-    // Populated data
-    user: ProjectUser;
-  }
-  
-  // ==================== TIME TRACKING INTERFACES ====================
+  // ==================== TIME ENTRY INTERFACES ====================
   
   export interface ProjectTimeEntry {
     id: string;
@@ -214,23 +204,21 @@ import {
     
     // Time details
     hours: number;
-    date: string; // Date only (YYYY-MM-DD)
-    startTime: string | null; // Time only (HH:mm)
-    endTime: string | null; // Time only (HH:mm)
+    date: string; // Date string (YYYY-MM-DD)
+    startTime: string | null; // Time string (HH:mm)
+    endTime: string | null; // Time string (HH:mm)
     
     // Billing
-    hourlyRate: number;
-    billableAmount: number;
     isBillable: boolean;
-    invoiced: boolean;
-    invoiceId: string | null;
+    hourlyRate: number | null;
+    totalCost: number;
     
     // Metadata
     createdAt: string;
     updatedAt: string;
     
     // Populated data
-    user: ProjectUser;
+    user?: ProjectUser;
     task?: ProjectTask | null;
     milestone?: ProjectMilestone | null;
   }
@@ -262,7 +250,7 @@ import {
     // Populated data
     fromUser: ProjectUser;
     toUsers: ProjectUser[];
-    attachments?: CommunicationAttachment[];
+    attachments: CommunicationAttachment[];
   }
   
   export interface CommunicationAttachment {
@@ -370,214 +358,78 @@ import {
     projectManager?: string;
   }
   
-  export interface CreateMilestoneForm {
-    name: string;
-    description: string;
-    startDate: string;
-    dueDate: string;
-    estimatedHours: number;
-    deliverables: string[];
-    dependencies?: string[];
-  }
-  
-  export interface CreateTaskForm {
-    title: string;
-    description: string;
-    priority: TaskPriority;
-    milestoneId?: string;
-    assignedTo?: string;
-    
-    // Timeline
-    startDate?: string;
-    dueDate?: string;
-    estimatedHours: number;
-    
-    // Dependencies
-    dependencies?: string[];
-    tags: string[];
-  }
-  
-  export interface CreateTimeEntryForm {
-    taskId?: string;
-    milestoneId?: string;
-    type: TimeEntryType;
-    description: string;
-    
-    // Time details
-    hours: number;
-    date: string;
-    startTime?: string;
-    endTime?: string;
-    
-    // Billing
-    isBillable: boolean;
-  }
-  
   // ==================== QUERY & FILTER INTERFACES ====================
   
   export interface ProjectQueryParams {
-    // Basic filtering
+    search?: string;
     status?: ProjectStatus[];
     priority?: ProjectPriority[];
     type?: ProjectType[];
     phase?: ProjectPhase[];
-    
-    // Client/Company filtering
     clientId?: string;
-    companyId?: string;
     projectManager?: string;
-    teamMember?: string;
-    
-    // Date filtering
-    startDateFrom?: string;
-    startDateTo?: string;
-    endDateFrom?: string;
-    endDateTo?: string;
-    
-    // Financial filtering
+    page?: number;
+    limit?: number;
+    sortBy?: 'name' | 'createdAt' | 'updatedAt' | 'startDate' | 'endDate' | 'budget' | 'priority';
+    sortOrder?: 'asc' | 'desc';
+    startDate?: string;
+    endDate?: string;
     budgetMin?: number;
     budgetMax?: number;
-    billingType?: BillingType[];
-    
-    // Search
-    search?: string;
-    tags?: string[];
-    
-    // Pagination
-    page?: number;
-    limit?: number;
-    sortBy?: 'name' | 'startDate' | 'endDate' | 'budget' | 'priority' | 'status' | 'updatedAt';
-    sortOrder?: 'asc' | 'desc';
   }
   
-  export interface TaskQueryParams {
-    projectId?: string;
-    milestoneId?: string;
-    assignedTo?: string;
-    status?: TaskStatus[];
-    priority?: TaskPriority[];
-    
-    // Date filtering
-    dueDateFrom?: string;
-    dueDateTo?: string;
-    
-    // Search
-    search?: string;
-    tags?: string[];
-    
-    // Pagination
-    page?: number;
-    limit?: number;
-    sortBy?: 'title' | 'dueDate' | 'priority' | 'status' | 'updatedAt';
-    sortOrder?: 'asc' | 'desc';
-  }
-  
-  // ==================== API RESPONSE INTERFACES ====================
-  
-  export interface ApiResponse<T = any> {
-    success: boolean;
-    message: string;
-    data?: T;
-    error?: string;
-    errors?: Array<{
-      field: string;
-      message: string;
-    }>;
-  }
-  
-  export interface PaginatedResponse<T = any> {
-    success: boolean;
-    data: T[];
-    pagination: {
-      currentPage: number;
-      totalPages: number;
-      totalItems: number;
-      itemsPerPage: number;
-      hasNextPage: boolean;
-      hasPreviousPage: boolean;
-    };
-  }
-  
-  // ==================== DASHBOARD & ANALYTICS INTERFACES ====================
+  // ==================== DASHBOARD & STATISTICS INTERFACES ====================
   
   export interface ProjectDashboardData {
-    // Summary stats
+    activeProjects: Project[];
+    recentProjects: Project[];
+    completedThisMonth: number;
+    totalBudgetThisMonth: number;
+    overdueMilestones: ProjectMilestone[];
+    pendingApprovals: ProjectMilestone[];
+    teamProductivity: TeamProductivityData[];
+  }
+  
+  export interface TeamProductivityData {
+    userId: string;
+    user: ProjectUser;
+    hoursLogged: number;
+    tasksCompleted: number;
+    productivity: number; // percentage
+  }
+  
+  export interface ProjectStatistics {
     totalProjects: number;
     activeProjects: number;
     completedProjects: number;
-    overdueProjects: number;
-    
-    // Financial summary
     totalBudget: number;
     totalRevenue: number;
-    totalCosts: number;
-    profitMargin: number;
-    
-    // Time tracking summary
+    averageBudget: number;
     totalEstimatedHours: number;
     totalActualHours: number;
-    utilizationRate: number;
+    averageCompletion: number;
     
-    // Recent activity
-    recentProjects: Project[];
-    upcomingMilestones: ProjectMilestone[];
-    overdueTasks: ProjectTask[];
+    // Distribution data
+    projectsByType: Array<{
+      type: ProjectType;
+      count: number;
+    }>;
     
-    // Charts data
-    projectStatusChart: Array<{ status: ProjectStatus; count: number }>;
-    monthlyRevenueChart: Array<{ month: string; revenue: number }>;
-    teamUtilizationChart: Array<{ user: string; hours: number; utilization: number }>;
+    projectsByPriority: Array<{
+      priority: ProjectPriority;
+      count: number;
+    }>;
+    
+    projectsByStatus: Array<{
+      status: ProjectStatus;
+      count: number;
+    }>;
   }
   
-  // ==================== HELPER TYPES ====================
+  // ==================== API RESPONSE TYPES ====================
   
-  export type ProjectStatusColor = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info';
-  export type TaskStatusColor = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error';
-  export type PriorityColor = 'success' | 'info' | 'warning' | 'error';
-  
-  // ==================== VALIDATION SCHEMAS ====================
-  
-  export const PROJECT_FORM_VALIDATION = {
-    NAME: {
-      MIN_LENGTH: 3,
-      MAX_LENGTH: 100,
-      REQUIRED: true
-    },
-    DESCRIPTION: {
-      MIN_LENGTH: 10,
-      MAX_LENGTH: 2000,
-      REQUIRED: true
-    },
-    BUDGET: {
-      MIN: 0,
-      MAX: 10000000,
-      REQUIRED: true
-    },
-    ESTIMATED_HOURS: {
-      MIN: 1,
-      MAX: 10000,
-      REQUIRED: true
-    },
-    DELIVERABLES: {
-      MIN_COUNT: 1,
-      MAX_COUNT: 20
-    }
-  };
-  
-  export const TASK_FORM_VALIDATION = {
-    TITLE: {
-      MIN_LENGTH: 3,
-      MAX_LENGTH: 150,
-      REQUIRED: true
-    },
-    DESCRIPTION: {
-      MIN_LENGTH: 5,
-      MAX_LENGTH: 1000,
-      REQUIRED: true
-    },
-    ESTIMATED_HOURS: {
-      MIN: 0.5,
-      MAX: 1000,
-      REQUIRED: true
-    }
-  };
+  export interface ProjectsApiResponse {
+    projects: Project[];
+    totalCount: number;
+    hasNextPage: boolean;
+  }

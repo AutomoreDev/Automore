@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authController } from '../../controllers/auth/authController';
-import { firebaseAuthMiddleware, jwtAuthMiddleware } from '../../middleware/auth/authMiddleware';
+import { jwtAuthMiddleware } from '../../middleware/auth/authMiddleware';
 import { 
   validateLoginRequest, 
   validateRegisterRequest,  // ADD THIS
@@ -52,7 +52,7 @@ router.post('/refresh',
  * @access  Private
  */
 router.post('/logout',
-  firebaseAuthMiddleware, // Use Firebase auth for logout
+  jwtAuthMiddleware, // Use JWT auth for logout
   authController.logout
 );
 
@@ -62,7 +62,7 @@ router.post('/logout',
  * @access  Private
  */
 router.get('/profile',
-  firebaseAuthMiddleware, // Use Firebase auth for profile
+  jwtAuthMiddleware, // Use JWT auth for profile
   authController.getProfile
 );
 
@@ -72,7 +72,7 @@ router.get('/profile',
  * @access  Private
  */
 router.put('/profile',
-  firebaseAuthMiddleware, // Use Firebase auth for profile updates
+  jwtAuthMiddleware, // Use JWT auth for profile updates
   validateUpdateProfileRequest,
   authController.updateProfile
 );
@@ -83,7 +83,7 @@ router.put('/profile',
  * @access  Private
  */
 router.post('/change-password',
-  firebaseAuthMiddleware, // Use Firebase auth for password change
+  jwtAuthMiddleware, // Use JWT auth for password change
   rateLimitMiddleware(3, 60), // 3 attempts per hour
   validateChangePasswordRequest,
   authController.changePassword
@@ -106,7 +106,7 @@ router.post('/reset-password',
  * @access  Private
  */
 router.get('/verify-token',
-  firebaseAuthMiddleware,
+  jwtAuthMiddleware,
   (req, res) => {
     res.status(200).json({
       success: true,

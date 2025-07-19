@@ -130,7 +130,7 @@ export const TicketDetail: React.FC = () => {
   }, [ticket, reset]);
 
   const handleBack = useCallback(() => {
-    navigate('/tickets');
+    navigate('/dashboard/tickets');
   }, [navigate]);
 
   const handleEdit = useCallback(() => {
@@ -159,7 +159,7 @@ export const TicketDetail: React.FC = () => {
   const handleDelete = useCallback(async () => {
     try {
       await deleteTicket();
-      navigate('/tickets');
+      navigate('/dashboard/tickets');
     } catch (error) {
       console.error('Failed to delete ticket:', error);
     }
@@ -222,7 +222,7 @@ export const TicketDetail: React.FC = () => {
                 startIcon={<DeleteIcon />}
                 onClick={() => setDeleteDialogOpen(true)}
               >
-                Delete
+                Close
               </Button>
             </Box>
           )}
@@ -556,18 +556,18 @@ export const TicketDetail: React.FC = () => {
           </form>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Close Confirmation Dialog */}
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete Ticket</DialogTitle>
+          <DialogTitle>Close Ticket</DialogTitle>
           <DialogContent>
             <Typography>
-              Are you sure you want to delete this ticket? This action cannot be undone.
+              Are you sure you want to close this ticket? The ticket will be marked as closed and moved to archived status.
             </Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleDelete} color="error" variant="contained">
-              Delete
+              Close Ticket
             </Button>
           </DialogActions>
         </Dialog>

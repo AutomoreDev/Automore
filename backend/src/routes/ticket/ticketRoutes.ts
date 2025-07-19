@@ -1,14 +1,36 @@
 // backend/src/routes/ticket/ticketRoutes.ts
 
 import { Router } from 'express';
+import multer from 'multer';
 import { TicketController } from '../../controllers/ticket/ticketController';
-import { firebaseAuthMiddleware } from '../../middleware/auth/authMiddleware';
-import { validateTicketCreation, validateTicketUpdate } from '../../middleware/validation/ticketValidation';
+import { jwtAuthMiddleware } from '../../middleware/auth/authMiddleware';
+import { validateTicketCreation, validateTicketUpdate, validateTicketMessage, parseFormDataFields } from '../../middleware/validation/ticketValidation';
 import { 
   ticketCreationRateLimit,
   ticketUpdateRateLimit,
   ticketQueryRateLimit
 } from '../../middleware/security/rateLimitMiddleware';
+
+// Configure multer for file uploads
+const upload = multer({
+  dest: 'uploads/tickets/',
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 5 // Maximum 5 files
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow common file types
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt|zip|rar/;
+    const extname = allowedTypes.test(file.originalname.toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only allowed file types are accepted'));
+    }
+  }
+});
 
 const router = Router();
 const ticketController = new TicketController();
@@ -20,21 +42,28 @@ const ticketController = new TicketController();
  * @desc    Get ticket statistics for dashboard
  * @access  Private (Authenticated users)
  */
-router.get('/statistics', firebaseAuthMiddleware, ticketQueryRateLimit, ticketController.getTicketStatistics);
+router.get('/statistics', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getTicketStatistics);
+
+/**
+ * @route   GET /api/v1/tickets/available-agents
+ * @desc    Get available support agents for ticket assignment
+ * @access  Private (Admins only)
+ */
+router.get('/available-agents', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getAvailableAgents);
 
 /**
  * @route   GET /api/v1/tickets/my-tickets
  * @desc    Get tickets assigned to current user
  * @access  Private (Authenticated users)
  */
-router.get('/my-tickets', firebaseAuthMiddleware, ticketQueryRateLimit, ticketController.getMyTickets);
+router.get('/my-tickets', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getMyTickets);
 
 /**
  * @route   GET /api/v1/tickets/my-created-tickets
  * @desc    Get tickets created by current user
  * @access  Private (Authenticated users)
  */
-router.get('/my-created-tickets', firebaseAuthMiddleware, ticketQueryRateLimit, ticketController.getMyCreatedTickets);
+router.get('/my-created-tickets', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getMyCreatedTickets);
 
 /**
  * @route   GET /api/v1/tickets
@@ -42,7 +71,7 @@ router.get('/my-created-tickets', firebaseAuthMiddleware, ticketQueryRateLimit, 
  * @access  Private (Authenticated users)
  * @query   status, priority, category, assignedTo, createdBy, companyId, tags, search, sortBy, sortOrder, limit, offset
  */
-router.get('/', firebaseAuthMiddleware, ticketQueryRateLimit, ticketController.getTickets);
+router.get('/', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getTickets);
 
 /**
  * @route   POST /api/v1/tickets
@@ -52,8 +81,10 @@ router.get('/', firebaseAuthMiddleware, ticketQueryRateLimit, ticketController.g
  */
 router.post(
   '/', 
-  firebaseAuthMiddleware, 
+  jwtAuthMiddleware, 
   ticketCreationRateLimit,
+  upload.array('attachments', 5), // Handle file uploads
+  parseFormDataFields,
   validateTicketCreation, 
   ticketController.createTicket
 );
@@ -63,7 +94,21 @@ router.post(
  * @desc    Get a specific ticket by ID
  * @access  Private (Authenticated users with access to ticket)
  */
-router.get('/:id', firebaseAuthMiddleware, ticketQueryRateLimit, ticketController.getTicketById);
+router.get('/:id', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getTicketById);
+
+/**
+ * @route   GET /api/v1/tickets/:id/messages
+ * @desc    Get all messages for a ticket
+ * @access  Private (Authenticated users with access to ticket)
+ */
+router.get('/:id/messages', jwtAuthMiddleware, ticketQueryRateLimit, ticketController.getTicketMessages);
+
+/**
+ * @route   POST /api/v1/tickets/:id/messages
+ * @desc    Create a new message for a ticket
+ * @access  Private (Authenticated users with access to ticket)
+ */
+router.post('/:id/messages', jwtAuthMiddleware, ticketCreationRateLimit, upload.array('attachments', 5), validateTicketMessage, ticketController.createTicketMessage);
 
 /**
  * @route   PUT /api/v1/tickets/:id
@@ -73,17 +118,25 @@ router.get('/:id', firebaseAuthMiddleware, ticketQueryRateLimit, ticketControlle
  */
 router.put(
   '/:id', 
-  firebaseAuthMiddleware, 
+  jwtAuthMiddleware, 
   ticketUpdateRateLimit,
   validateTicketUpdate, 
   ticketController.updateTicket
 );
 
 /**
+ * @route   PUT /api/v1/tickets/:id/assign
+ * @desc    Assign or unassign a ticket to a user
+ * @access  Private (Admins only)
+ * @body    { assignedTo: string | null }
+ */
+router.put('/:id/assign', jwtAuthMiddleware, ticketUpdateRateLimit, ticketController.assignTicket);
+
+/**
  * @route   DELETE /api/v1/tickets/:id
  * @desc    Delete a ticket (soft delete)
  * @access  Private (Admin users only)
  */
-router.delete('/:id', firebaseAuthMiddleware, ticketUpdateRateLimit, ticketController.deleteTicket);
+router.delete('/:id', jwtAuthMiddleware, ticketUpdateRateLimit, ticketController.deleteTicket);
 
 export default router;
